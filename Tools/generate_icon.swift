@@ -17,13 +17,19 @@ guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
         bitsPerComponent: 8,
         bytesPerRow: 0,
         space: colorSpace,
-        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        // Les icônes iOS doivent être OPAQUES (pas de canal alpha), sinon actool
+        // les rejette et aucune icône n'apparaît. noneSkipLast = pas d'alpha.
+        bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
       ) else {
     FileHandle.standardError.write("Impossible de créer le contexte graphique.\n".data(using: .utf8)!)
     exit(1)
 }
 
 let rect = CGRect(x: 0, y: 0, width: size, height: size)
+
+// Remplit d'abord tout le fond en opaque (sécurité pour éviter toute zone transparente).
+ctx.setFillColor(CGColor(red: 0.18, green: 0.15, blue: 0.45, alpha: 1.0))
+ctx.fill(rect)
 
 // Fond en dégradé (violet -> indigo).
 let colors = [
