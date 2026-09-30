@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import UIKit
 
 /// Source de vérité de l'app : la liste des cartes.
 ///
@@ -52,10 +53,20 @@ final class CardStore: ObservableObject {
 
     // MARK: - Opérations
 
+    /// Décrit l'intention de l'utilisateur vis-à-vis de l'image de fond lors
+    /// d'un `upsert`, pour ne pas confondre « ne rien changer » et « retirer ».
+    enum ArtChange {
+        case unchanged          // laisser l'image existante telle quelle
+        case set(UIImage)       // définir / remplacer par cette image
+        case remove             // retirer l'image existante
+    }
+
     /// Ajoute ou met à jour une carte. Pour une carte bancaire, `fullNumber`
     /// (le numéro complet) est stocké dans le Keychain, pas dans le JSON.
-    /// - Throws: `SecureVault.VaultError` si l'écriture du secret échoue.
-    func upsert(_ card: Card, fullNumber: String? = nil) throws {
+    /// L'image de fond éventuelle est écrite via `ArtVault`, indexée par id.
+    /// - Throws: `SecureVault.VaultError` si l'écriture du secret échoue,
+    ///           ou `ArtVault.ArtError` si l'écriture de l'image échoue.
+    func upsert(_ card: Card, fullNumber: String? = nil, art: ArtChange = .unchanged) throws {
         var toSave = card
 
         if card.kind == .bank, let number = fullNumber, !number.isEmpty {
@@ -64,6 +75,23 @@ final class CardStore: ObservableObject {
             // On écrit d'abord le secret : si le Keychain refuse, on ne veut
             // pas laisser une carte sans son numéro. L'erreur remonte à l'UI.
             try SecureVault.save(digits, for: card.id.uuidString)
+        }
+
+        // Gestion de l'image de fond. On écrit/supprime le fichier AVANT de
+        // fixer le drapeau, pour que `hasCustomArt` reflète l'état réel du disque.
+        switch art {
+        case .unchanged:
+            // On conserve le drapeau tel qu'il vient (ou l'état existant si la
+            // carte existe déjà et que l'appelant ne l'a pas touché).
+            if let existing = cards.first(where: { $0.id == card.id }) {
+                toSave.hasCustomArt = existing.hasCustomArt
+            }
+        case .set(let image):
+            try ArtVault.save(image, for: card.id.uuidString)
+            toSave.hasCustomArt = true
+        case .remove:
+            ArtVault.delete(card.id.uuidString)
+            toSave.hasCustomArt = false
         }
 
         if let idx = cards.firstIndex(where: { $0.id == card.id }) {
@@ -88,6 +116,7 @@ final class CardStore: ObservableObject {
         if card.kind == .bank {
             _ = try? SecureVault.delete(card.id.uuidString)
         }
+        ArtVault.delete(card.id.uuidString)
         persist()
     }
 
@@ -112,6 +141,7 @@ final class CardStore: ObservableObject {
             if card.kind == .bank {
                 _ = try? SecureVault.delete(card.id.uuidString)
             }
+            ArtVault.delete(card.id.uuidString)
         }
         cards.remove(atOffsets: offsets)
         persist()
@@ -164,6 +194,10 @@ final class CardStore: ObservableObject {
         let liveIDs = Set(cards.map { $0.id.uuidString })
         for key in SecureVault.allKeys() where !liveIDs.contains(key) {
             _ = try? SecureVault.delete(key)
+        }
+        // Même logique pour les images de fond orphelines (import/suppression).
+        for key in ArtVault.allKeys() where !liveIDs.contains(key) {
+            ArtVault.delete(key)
         }
     }
 

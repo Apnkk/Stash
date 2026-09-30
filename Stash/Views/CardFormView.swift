@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 /// Formulaire d'ajout / modification d'une carte.
 ///
@@ -36,6 +37,14 @@ struct CardFormView: View {
 
     // Commun
     @State private var note = ""
+
+    // Image de fond ("card art")
+    /// Élément choisi dans la photothèque, en attente de chargement en UIImage.
+    @State private var artItem: PhotosPickerItem?
+    /// Aperçu affiché (image existante chargée à l'édition, ou nouvelle sélection).
+    @State private var artPreview: UIImage?
+    /// Intention à appliquer au moment de l'enregistrement.
+    @State private var artChange: CardStore.ArtChange = .unchanged
 
     @State private var showDeleteConfirm = false
     @State private var saveError: String?
@@ -144,6 +153,14 @@ struct CardFormView: View {
                 }
 
                 Section {
+                    artPickerRow
+                } header: {
+                    Text("Image de fond")
+                } footer: {
+                    Text("Personnalise la carte avec une photo. Elle reste sur ton téléphone, hors sauvegarde iCloud.")
+                }
+
+                Section {
                     TextField("Note (facultatif)", text: $note, axis: .vertical)
                         .lineLimit(1...4)
                 } header: {
@@ -212,9 +229,9 @@ struct CardFormView: View {
         VStack(spacing: 10) {
             Group {
                 if kind == .bank {
-                    RealisticCardView(card: previewCard, revealedNumber: nil)
+                    RealisticCardView(card: previewCard, revealedNumber: nil, artOverride: artPreview)
                 } else {
-                    CardPreviewTile(card: previewCard)
+                    CardPreviewTile(card: previewCard, artOverride: artPreview)
                 }
             }
             .animation(Motion.snappy, value: colorHex)
@@ -334,6 +351,77 @@ struct CardFormView: View {
         .padding(.vertical, 4)
     }
 
+    /// Ligne de la section « Image de fond » : aperçu (si présent), bouton de
+    /// choix via la photothèque, et bouton de retrait le cas échéant.
+    @ViewBuilder
+    private var artPickerRow: some View {
+        if let artPreview {
+            HStack(spacing: 12) {
+                Image(uiImage: artPreview)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 66, height: 42)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+                    )
+                    .accessibilityLabel("Aperçu de l'image de fond")
+
+                Text("Image sélectionnée")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Button(role: .destructive) {
+                    Haptics.light()
+                    withAnimation(Motion.snappy) {
+                        self.artPreview = nil
+                        self.artItem = nil
+                        self.artChange = .remove
+                    }
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Retirer l'image de fond")
+            }
+        }
+
+        PhotosPicker(
+            selection: $artItem,
+            matching: .images,
+            photoLibrary: .shared()
+        ) {
+            Label(
+                artPreview == nil ? "Choisir une image" : "Changer l'image",
+                systemImage: "photo"
+            )
+        }
+        .onChange(of: artItem) { _, newItem in
+            guard let newItem else { return }
+            Task { await loadPickedArt(newItem) }
+        }
+    }
+
+    /// Charge l'image sélectionnée dans la photothèque en `UIImage`, met à jour
+    /// l'aperçu et enregistre l'intention `.set` pour la sauvegarde.
+    @MainActor
+    private func loadPickedArt(_ item: PhotosPickerItem) async {
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let image = UIImage(data: data) else {
+            withAnimation(Motion.snappy) {
+                saveError = "Impossible de charger l'image choisie."
+            }
+            return
+        }
+        withAnimation(Motion.snappy) {
+            artPreview = image
+            artChange = .set(image)
+        }
+    }
+
     /// Configure le formulaire à l'apparition : type imposé pour une création,
     /// ou chargement des champs pour une édition.
     private func configureOnAppear() {
@@ -357,6 +445,12 @@ struct CardFormView: View {
         // Choix de design manuel déjà enregistré ("" -> Automatique).
         manualNetwork = CardNetwork(rawValue: card.manualNetworkRaw) ?? .unknown
         // On ne pré-remplit jamais le numéro complet : il reste dans le Keychain.
+
+        // Image de fond existante : on la charge pour l'aperçu, sans changer
+        // l'intention (elle reste `.unchanged` tant que l'utilisateur n'agit pas).
+        if card.hasCustomArt {
+            artPreview = ArtVault.load(card.id.uuidString)
+        }
     }
 
     /// Formate la saisie d'expiration en MM/AA au fil de la frappe.
@@ -404,7 +498,7 @@ struct CardFormView: View {
 
         let number = fullNumber.isEmpty ? nil : fullNumber
         do {
-            try store.upsert(updated, fullNumber: number)
+            try store.upsert(updated, fullNumber: number, art: artChange)
             // On n'appelle plus dismiss() ici : à la création, on montre
             // d'abord l'écran de succès, qui fera le dismiss à la fin. En
             // édition, on ferme directement (pas de célébration nécessaire).
@@ -430,6 +524,8 @@ struct CardFormView: View {
 /// de la tuile d'accueil sans dépendre de l'état de surlignage.
 private struct CardPreviewTile: View {
     let card: Card
+    /// Image de fond à afficher en aperçu direct (avant enregistrement).
+    var artOverride: UIImage? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -460,13 +556,27 @@ private struct CardPreviewTile: View {
         .padding(18)
         .frame(height: 130)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [Color(hex: card.colorHex), Color(hex: card.colorHex).opacity(0.75)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .background {
+            if let artOverride {
+                Image(uiImage: artOverride)
+                    .resizable()
+                    .scaledToFill()
+                    .overlay(
+                        // Voile sombre pour garder le texte lisible sur toute image.
+                        LinearGradient(
+                            colors: [.black.opacity(0.15), .black.opacity(0.55)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            } else {
+                LinearGradient(
+                    colors: [Color(hex: card.colorHex), Color(hex: card.colorHex).opacity(0.75)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
     }

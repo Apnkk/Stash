@@ -10,6 +10,16 @@ struct RealisticCardView: View {
     let card: Card
     /// Numéro complet déjà déchiffré, ou `nil` pour l'affichage masqué.
     var revealedNumber: String? = nil
+    /// Image de fond injectée pour l'aperçu direct (formulaire). Si `nil`, on
+    /// charge l'image persistée via `ArtVault` quand `card.hasCustomArt`.
+    var artOverride: UIImage? = nil
+
+    /// Image de fond effective : l'override d'aperçu prime, sinon celle stockée.
+    private var backgroundArt: UIImage? {
+        if let artOverride { return artOverride }
+        guard card.hasCustomArt else { return nil }
+        return ArtVault.load(card.id.uuidString)
+    }
 
     /// Réseau à utiliser pour l'apparence : d'abord celui figé à la saisie
     /// (persisté, non sensible), sinon détecté depuis le numéro révélé s'il
@@ -67,6 +77,24 @@ struct RealisticCardView: View {
                         endPoint: .bottomTrailing
                     )
                 )
+                .overlay {
+                    // Image de fond éventuelle, sous un voile sombre pour que
+                    // le texte, la puce et le logo restent lisibles.
+                    if let backgroundArt {
+                        Image(uiImage: backgroundArt)
+                            .resizable()
+                            .scaledToFill()
+                            .overlay(
+                                LinearGradient(
+                                    colors: [.black.opacity(0.20), .black.opacity(0.60)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .allowsHitTesting(false)
+                    }
+                }
                 .overlay(alignment: .topTrailing) {
                     // Reflet diagonal discret pour un rendu « plastique ».
                     RoundedRectangle(cornerRadius: 20, style: .continuous)

@@ -198,6 +198,12 @@ struct CardTileView: View {
 
     @State private var glow = false
 
+    /// Image de fond éventuelle de la vignette (chargée depuis ArtVault).
+    private var backgroundArt: UIImage? {
+        guard card.hasCustomArt else { return nil }
+        return ArtVault.load(card.id.uuidString)
+    }
+
     /// Couleurs de fond de la vignette : dégradé de marque de la banque
     /// détectée si l'utilisateur a gardé la couleur par défaut, sinon sa
     /// couleur personnalisée.
@@ -267,13 +273,27 @@ struct CardTileView: View {
         .padding(18)
         .frame(height: 130)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: tileColors,
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .background {
+            if let backgroundArt {
+                Image(uiImage: backgroundArt)
+                    .resizable()
+                    .scaledToFill()
+                    .overlay(
+                        // Voile sombre pour garder le texte lisible sur l'image.
+                        LinearGradient(
+                            colors: [.black.opacity(0.15), .black.opacity(0.55)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            } else {
+                LinearGradient(
+                    colors: tileColors,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
         .overlay {
             if #available(iOS 26, *) {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
