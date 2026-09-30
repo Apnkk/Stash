@@ -23,7 +23,7 @@ struct RealisticCardView: View {
     /// L'utilisateur a-t-il gardé la couleur par défaut ? Si oui, on habille
     /// la carte avec le dégradé de marque du réseau détecté.
     private var usesDefaultColor: Bool {
-        card.colorHex.uppercased() == "#4C8DFF"
+        card.colorHex.uppercased() == "#D62836"
     }
 
     private var gradientColors: [Color] {

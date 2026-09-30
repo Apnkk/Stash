@@ -165,6 +165,7 @@ struct CardDetailView: View {
                         .padding(.vertical, 8)
                 }
                 .glassButtonIfAvailable()
+                .pressable()
 
                 Button {
                     shareCode()
@@ -174,6 +175,7 @@ struct CardDetailView: View {
                         .padding(.vertical, 8)
                 }
                 .glassButtonIfAvailable()
+                .pressable()
                 .disabled(BarcodeGenerator.image(for: currentCard) == nil)
             }
 
@@ -238,6 +240,7 @@ struct CardDetailView: View {
                         .padding(.vertical, 8)
                 }
                 .glassProminentButtonIfAvailable()
+                .pressable()
                 .disabled(isCaptured)
             } else {
                 HStack(spacing: 12) {
@@ -249,6 +252,7 @@ struct CardDetailView: View {
                             .padding(.vertical, 8)
                     }
                     .glassButtonIfAvailable()
+                    .pressable()
 
                     Button {
                         copyNumber()
@@ -258,6 +262,7 @@ struct CardDetailView: View {
                             .padding(.vertical, 8)
                     }
                     .glassProminentButtonIfAvailable()
+                    .pressable()
                 }
             }
 
@@ -309,13 +314,17 @@ struct CardDetailView: View {
                     try SecureVault.read(key, prompt: reason)
                 }.value
                 await MainActor.run {
-                    revealedNumber = number
+                    Haptics.success()
+                    withAnimation(Motion.standard) { revealedNumber = number }
                     scheduleAutoHide()
                 }
             } catch {
                 let message = (error as? LocalizedError)?.errorDescription
                     ?? "Authentification refusée."
-                await MainActor.run { authError = message }
+                await MainActor.run {
+                    Haptics.error()
+                    withAnimation(Motion.snappy) { authError = message }
+                }
             }
         }
     }
@@ -331,7 +340,8 @@ struct CardDetailView: View {
     }
 
     private func hide() {
-        revealedNumber = nil
+        Haptics.rigid()
+        withAnimation(Motion.standard) { revealedNumber = nil }
         copied = false
         autoHideTask?.cancel()
         autoHideTask = nil
@@ -340,17 +350,19 @@ struct CardDetailView: View {
     private func copyNumber() {
         guard let number = revealedNumber else { return }
         UIPasteboard.general.string = number.filter(\.isNumber)
-        copied = true
+        Haptics.success()
+        withAnimation(Motion.snappy) { copied = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
-            copied = false
+            withAnimation(Motion.snappy) { copied = false }
         }
     }
 
     private func copyCode() {
         UIPasteboard.general.string = currentCard.code
-        codeCopied = true
+        Haptics.success()
+        withAnimation(Motion.snappy) { codeCopied = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
-            codeCopied = false
+            withAnimation(Motion.snappy) { codeCopied = false }
         }
     }
 

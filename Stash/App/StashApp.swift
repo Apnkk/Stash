@@ -6,6 +6,9 @@ struct StashApp: App {
     @StateObject private var lock = AppLock()
     @Environment(\.scenePhase) private var scenePhase
 
+    /// Présentation vue au moins une fois ? Persisté par `OnboardingView`.
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+
     var body: some Scene {
         WindowGroup {
             ZStack {
@@ -18,8 +21,19 @@ struct StashApp: App {
                         .environmentObject(lock)
                         .transition(.opacity)
                 }
+
+                // L'onboarding recouvre tout au tout premier lancement ; il se
+                // retire avec une transition douce dès qu'on le termine/passe.
+                if !hasSeenOnboarding {
+                    OnboardingView { hasSeenOnboarding = true }
+                        .transition(.opacity)
+                        .zIndex(10)
+                }
             }
-            .animation(.easeInOut(duration: 0.25), value: lock.isUnlocked)
+            .background(Color.black.ignoresSafeArea())
+            .tint(Color.stashRed)
+            .animation(Motion.standard, value: lock.isUnlocked)
+            .animation(Motion.soft, value: hasSeenOnboarding)
             .preferredColorScheme(.dark)
             .onAppear { lock.unlockIfNeeded() }
             .onChange(of: scenePhase) { _, newPhase in

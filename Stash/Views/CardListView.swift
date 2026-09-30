@@ -30,6 +30,7 @@ struct CardListView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
+                        Haptics.light()
                         showingSettings = true
                     } label: {
                         Image(systemName: "gearshape")
@@ -38,6 +39,7 @@ struct CardListView: View {
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
+                        Haptics.medium()
                         editingCard = nil
                         showingForm = true
                     } label: {
@@ -60,7 +62,7 @@ struct CardListView: View {
 
     private var cardGrid: some View {
         List {
-            ForEach(filteredCards) { card in
+            ForEach(Array(filteredCards.enumerated()), id: \.element.id) { index, card in
                 ZStack {
                     NavigationLink {
                         CardDetailView(card: card)
@@ -71,34 +73,65 @@ struct CardListView: View {
                     .opacity(0)
 
                     CardTileView(card: card)
+                        .pressable()
                 }
                 .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
+                .appearInCascade(index: index)
+                .transition(.cardAppear)
             }
             .onMove(perform: searchText.isEmpty ? move : nil)
             .onDelete(perform: searchText.isEmpty ? deleteCards : nil)
         }
         .listStyle(.plain)
+        .animation(Motion.standard, value: filteredCards.map(\.id))
     }
 
     /// Réordonne dans le store (uniquement hors recherche).
     private func move(from source: IndexSet, to destination: Int) {
-        store.move(from: source, to: destination)
+        Haptics.selection()
+        withAnimation(Motion.standard) {
+            store.move(from: source, to: destination)
+        }
     }
 
     /// Supprime les cartes correspondant aux positions de la liste filtrée.
     private func deleteCards(at offsets: IndexSet) {
         let ids = offsets.map { filteredCards[$0].id }
         let storeOffsets = IndexSet(store.cards.enumerated().compactMap { ids.contains($0.element.id) ? $0.offset : nil })
-        store.delete(at: storeOffsets)
+        Haptics.rigid()
+        withAnimation(Motion.standard) {
+            store.delete(at: storeOffsets)
+        }
     }
 
     private var emptyState: some View {
+        EmptyStateView {
+            editingCard = nil
+            showingForm = true
+        }
+    }
+}
+
+/// État vide animé : l'icône respire doucement pour donner vie à l'écran,
+/// et l'ensemble apparaît en fondu montant.
+private struct EmptyStateView: View {
+    var onAdd: () -> Void
+
+    @State private var pulse = false
+    @State private var appeared = false
+
+    var body: some View {
         VStack(spacing: 14) {
             Image(systemName: "creditcard.fill")
                 .font(.system(size: 56))
                 .foregroundStyle(.tint)
+                .scaleEffect(pulse ? 1.06 : 0.94)
+                .animation(
+                    .easeInOut(duration: 1.8).repeatForever(autoreverses: true),
+                    value: pulse
+                )
             Text("Aucune carte")
                 .font(.title2.weight(.bold))
             Text("Ajoute ta première carte de fidélité ou bancaire. Tout reste chiffré sur ton téléphone.")
@@ -107,8 +140,7 @@ struct CardListView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
             Button {
-                editingCard = nil
-                showingForm = true
+                onAdd()
             } label: {
                 Label("Ajouter une carte", systemImage: "plus")
                     .font(.headline)
@@ -116,9 +148,16 @@ struct CardListView: View {
                     .padding(.vertical, 10)
             }
             .glassProminentButtonIfAvailable()
+            .pressable()
             .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .opacity(appeared ? 1 : 0)
+        .offset(y: appeared ? 0 : 20)
+        .onAppear {
+            pulse = true
+            withAnimation(Motion.soft) { appeared = true }
+        }
     }
 }
 

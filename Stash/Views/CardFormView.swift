@@ -203,7 +203,10 @@ struct CardFormView: View {
                             Circle().strokeBorder(.primary, lineWidth: 3)
                         }
                     }
-                    .onTapGesture { colorHex = hex }
+                    .onTapGesture {
+                        Haptics.selection()
+                        withAnimation(Motion.snappy) { colorHex = hex }
+                    }
                     .accessibilityLabel("Couleur \(hex)")
                     .accessibilityAddTraits(hex == colorHex ? .isSelected : [])
             }
@@ -249,10 +252,14 @@ struct CardFormView: View {
         let number = fullNumber.isEmpty ? nil : fullNumber
         do {
             try store.upsert(updated, fullNumber: number)
+            Haptics.success()
             dismiss()
         } catch {
-            saveError = (error as? LocalizedError)?.errorDescription
-                ?? "Impossible d'enregistrer la carte."
+            Haptics.error()
+            withAnimation(Motion.snappy) {
+                saveError = (error as? LocalizedError)?.errorDescription
+                    ?? "Impossible d'enregistrer la carte."
+            }
         }
     }
 }

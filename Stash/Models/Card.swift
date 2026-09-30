@@ -188,7 +188,7 @@ struct Card: Identifiable, Codable, Equatable {
         id: UUID = UUID(),
         kind: CardKind,
         name: String,
-        colorHex: String = "#4C8DFF",
+        colorHex: String = "#D62836",
         code: String = "",
         format: BarcodeFormat = .auto,
         holder: String = "",
@@ -237,11 +237,12 @@ struct Card: Identifiable, Codable, Equatable {
 }
 
 /// Palette de couleurs proposée à l'ajout d'une carte.
+/// Thème rouge/noir : rouges, bordeaux et nuances sombres en priorité.
 enum Palette {
     static let colors: [String] = [
-        "#4C8DFF", "#FF5A5F", "#34C759", "#FF9F0A",
-        "#AF52DE", "#00C7BE", "#FF375F", "#5E5CE6",
-        "#8E8E93", "#1C1C1E"
+        "#D62836", "#E1394A", "#9E1B26", "#7A1520",
+        "#B8232F", "#FF375F", "#3A3A3C", "#2A2A2E",
+        "#1C1C1E", "#0F0F11"
     ]
 }
 
@@ -261,4 +262,7 @@ extension Color {
         }
         self.init(.sRGB, red: r, green: g, blue: b, opacity: 1.0)
     }
+
+    /// Couleur d'accent de l'app (thème rouge/noir), utilisée comme tint global.
+    static let stashRed = Color(hex: "#E12E3C")
 }
