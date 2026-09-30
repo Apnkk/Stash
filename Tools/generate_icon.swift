@@ -1,9 +1,12 @@
 #!/usr/bin/swift
 // Génère toutes les tailles d'icône de l'app Stash À PARTIR de l'image source
 // AppIcon-1024.png fournie (redimensionnement), au lieu de dessiner un placeholder.
-// Utilisé par le workflow CI (macOS) avant la compilation.
-import AppKit
+// Décodage via ImageIO + rendu CoreGraphics uniquement : aucune dépendance à AppKit
+// ni à une session graphique, donc fiable sur un runner CI macOS headless.
+import Foundation
 import CoreGraphics
+import ImageIO
+import UniformTypeIdentifiers
 
 // Chemin de l'image source 1024x1024 (obligatoire).
 let sourcePath = CommandLine.arguments.count > 1
@@ -15,11 +18,11 @@ guard FileManager.default.fileExists(atPath: sourcePath) else {
     exit(1)
 }
 
-// Charge l'image source en CGImage.
-guard let srcData = FileManager.default.contents(atPath: sourcePath),
-      let srcRep = NSBitmapImageRep(data: srcData),
-      let sourceImage = srcRep.cgImage else {
-    FileHandle.standardError.write("Impossible de lire l'image source : \(sourcePath)\n".data(using: .utf8)!)
+// Charge l'image source en CGImage via ImageIO (pas d'AppKit).
+guard let srcData = FileManager.default.contents(atPath: sourcePath) as CFData?,
+      let imageSource = CGImageSourceCreateWithData(srcData, nil),
+      let sourceImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
+    FileHandle.standardError.write("Impossible de décoder l'image source : \(sourcePath)\n".data(using: .utf8)!)
     exit(1)
 }
 
@@ -43,7 +46,7 @@ func renderIcon(pixels: Int) -> CGImage? {
     let rect = CGRect(x: 0, y: 0, width: s, height: s)
 
     // Fond opaque de sécurité (au cas où la source aurait de la transparence).
-    ctx.setFillColor(CGColor(red: 0.18, green: 0.15, blue: 0.45, alpha: 1.0))
+    ctx.setFillColor(CGColor(colorSpace: colorSpace, components: [0.18, 0.15, 0.45, 1.0])!)
     ctx.fill(rect)
 
     // Dessine l'image source redimensionnée pour remplir toute l'icône.
@@ -53,18 +56,25 @@ func renderIcon(pixels: Int) -> CGImage? {
     return ctx.makeImage()
 }
 
+// Écrit un CGImage en PNG via ImageIO (pas d'AppKit).
 func writePNG(_ image: CGImage, to path: String) -> Bool {
-    let bitmapRep = NSBitmapImageRep(cgImage: image)
-    guard let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
+    let url = URL(fileURLWithPath: path) as CFURL
+    let pngType: CFString
+    if #available(macOS 11.0, *) {
+        pngType = UTType.png.identifier as CFString
+    } else {
+        pngType = "public.png" as CFString
+    }
+    guard let dest = CGImageDestinationCreateWithURL(url, pngType, 1, nil) else {
+        FileHandle.standardError.write("Impossible de créer la destination PNG (\(path)).\n".data(using: .utf8)!)
         return false
     }
-    do {
-        try pngData.write(to: URL(fileURLWithPath: path))
-        return true
-    } catch {
-        FileHandle.standardError.write("Erreur d'écriture (\(path)) : \(error)\n".data(using: .utf8)!)
+    CGImageDestinationAddImage(dest, image, nil)
+    if !CGImageDestinationFinalize(dest) {
+        FileHandle.standardError.write("Erreur d'écriture PNG (\(path)).\n".data(using: .utf8)!)
         return false
     }
+    return true
 }
 
 // Dossier de sortie = dossier de l'appiconset (déduit du chemin du 1024 passé en argument).
