@@ -50,6 +50,11 @@ struct AddCardTypeView: View {
                 CardFormView(card: nil, presetKind: kind)
                     .environmentObject(store)
             }
+            // Carte enregistrée : on ferme toute la feuille pour revenir
+            // directement à l'accueil, où la nouvelle carte est mise en avant.
+            .onChange(of: store.lastAddedCardID) { _, newID in
+                if newID != nil { dismiss() }
+            }
         }
     }
 

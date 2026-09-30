@@ -15,6 +15,10 @@ final class CardStore: ObservableObject {
     /// Dernière erreur de persistance, à afficher dans l'UI (nil si tout va bien).
     @Published var persistenceError: String?
 
+    /// Id de la dernière carte AJOUTÉE (pas modifiée), pour la surligner
+    /// brièvement à l'accueil. Remise à `nil` une fois l'animation jouée.
+    @Published var lastAddedCardID: UUID?
+
     private let fileURL: URL
 
     init() {
@@ -66,8 +70,14 @@ final class CardStore: ObservableObject {
             cards[idx] = toSave
         } else {
             cards.append(toSave)
+            lastAddedCardID = toSave.id
         }
         persist()
+    }
+
+    /// Efface le marqueur de dernière carte ajoutée (après l'animation d'accueil).
+    func clearLastAdded() {
+        lastAddedCardID = nil
     }
 
     /// Supprime une carte et son éventuel secret dans le Keychain.

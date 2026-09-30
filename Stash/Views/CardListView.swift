@@ -9,6 +9,8 @@ struct CardListView: View {
     @State private var editingCard: Card?
     @State private var searchText = ""
     @State private var showingSettings = false
+    /// Carte mise en avant à l'accueil juste après son ajout.
+    @State private var highlightedID: UUID?
 
     private var filteredCards: [Card] {
         guard !searchText.isEmpty else { return store.cards }
@@ -53,7 +55,7 @@ struct CardListView: View {
                 CardFormView(card: editingCard)
                     .environmentObject(store)
             }
-            .sheet(isPresented: $showingTypePicker) {
+            .sheet(isPresented: $showingTypePicker, onDismiss: highlightNewCard) {
                 AddCardTypeView()
                     .environmentObject(store)
             }
@@ -65,31 +67,55 @@ struct CardListView: View {
     }
 
     private var cardGrid: some View {
-        List {
-            ForEach(Array(filteredCards.enumerated()), id: \.element.id) { index, card in
-                ZStack {
-                    NavigationLink {
-                        CardDetailView(card: card)
-                            .environmentObject(store)
-                    } label: {
-                        EmptyView()
-                    }
-                    .opacity(0)
+        ScrollViewReader { proxy in
+            List {
+                ForEach(Array(filteredCards.enumerated()), id: \.element.id) { index, card in
+                    ZStack {
+                        NavigationLink {
+                            CardDetailView(card: card)
+                                .environmentObject(store)
+                        } label: {
+                            EmptyView()
+                        }
+                        .opacity(0)
 
-                    CardTileView(card: card)
-                        .pressable()
+                        CardTileView(card: card, isHighlighted: card.id == highlightedID)
+                            .pressable()
+                    }
+                    .id(card.id)
+                    .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .appearInCascade(index: index)
+                    .transition(.cardAppear)
                 }
-                .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-                .appearInCascade(index: index)
-                .transition(.cardAppear)
+                .onMove(perform: searchText.isEmpty ? move : nil)
+                .onDelete(perform: searchText.isEmpty ? deleteCards : nil)
             }
-            .onMove(perform: searchText.isEmpty ? move : nil)
-            .onDelete(perform: searchText.isEmpty ? deleteCards : nil)
+            .listStyle(.plain)
+            .animation(Motion.standard, value: filteredCards.map(\.id))
+            .onChange(of: highlightedID) { _, id in
+                // Fait défiler jusqu'à la nouvelle carte (ajoutée en fin de liste).
+                guard let id else { return }
+                withAnimation(Motion.soft) {
+                    proxy.scrollTo(id, anchor: .center)
+                }
+            }
         }
-        .listStyle(.plain)
-        .animation(Motion.standard, value: filteredCards.map(\.id))
+    }
+
+    /// Appelé à la fermeture de la feuille d'ajout : si une carte vient d'être
+    /// créée, on la met en avant quelques secondes puis on retire l'effet.
+    private func highlightNewCard() {
+        guard let id = store.lastAddedCardID else { return }
+        store.clearLastAdded()
+        searchText = ""
+        highlightedID = id
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
+            withAnimation(Motion.soft) {
+                if highlightedID == id { highlightedID = nil }
+            }
+        }
     }
 
     /// Réordonne dans le store (uniquement hors recherche).
@@ -167,6 +193,10 @@ private struct EmptyStateView: View {
 /// Vignette d'une carte dans la grille.
 struct CardTileView: View {
     let card: Card
+    /// `true` juste après l'ajout de cette carte : déclenche un halo + zoom.
+    var isHighlighted: Bool = false
+
+    @State private var glow = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -218,7 +248,30 @@ struct CardTileView: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            // Liseré lumineux qui pulse brièvement pour la carte tout juste ajoutée.
+            if isHighlighted {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(Color.white.opacity(glow ? 0.9 : 0.4), lineWidth: glow ? 3 : 1.5)
+                    .shadow(color: Color.stashRed.opacity(glow ? 0.7 : 0.3), radius: glow ? 16 : 6)
+                    .allowsHitTesting(false)
+            }
+        }
         .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
+        .scaleEffect(isHighlighted && glow ? 1.03 : 1)
+        .animation(.easeInOut(duration: 0.8).repeatCount(3, autoreverses: true), value: glow)
+        .onChange(of: isHighlighted) { _, newValue in
+            if newValue {
+                Haptics.success()
+                glow = true
+            } else {
+                glow = false
+            }
+        }
+        .onAppear {
+            // Cas où la tuile apparaît déjà surlignée (retour direct sur l'accueil).
+            if isHighlighted { glow = true }
+        }
     }
 
     /// Puce EMV miniature dorée, cohérente avec RealisticCardView.

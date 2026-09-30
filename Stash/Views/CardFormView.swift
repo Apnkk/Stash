@@ -1,6 +1,10 @@
 import SwiftUI
 
 /// Formulaire d'ajout / modification d'une carte.
+///
+/// Nouveauté : un aperçu en direct de la carte s'affiche en haut du formulaire
+/// et se met à jour au fil de la saisie (nom, couleur, code/numéro), pour que
+/// l'utilisateur voie tout de suite le rendu final.
 struct CardFormView: View {
     @EnvironmentObject private var store: CardStore
     @Environment(\.dismiss) private var dismiss
@@ -31,6 +35,10 @@ struct CardFormView: View {
 
     @State private var showDeleteConfirm = false
     @State private var saveError: String?
+
+    /// Non-nil après un enregistrement réussi : déclenche l'écran de succès.
+    /// Contient le nom de la carte à afficher dans la célébration.
+    @State private var savedCardName: String?
 
     /// Réseau bancaire déduit en direct du numéro saisi.
     private var detectedNetwork: CardNetwork {
@@ -75,9 +83,34 @@ struct CardFormView: View {
         }
     }
 
+    /// Carte reconstruite en direct depuis la saisie, pour l'aperçu.
+    private var previewCard: Card {
+        var c = card ?? Card(kind: kind, name: name)
+        c.kind = kind
+        c.name = name
+        c.colorHex = colorHex
+        c.code = code
+        c.format = format
+        c.holder = holder
+        c.expiry = expiry
+        if kind == .bank {
+            let digits = fullNumber.filter(\.isNumber)
+            if !digits.isEmpty {
+                c.lastFour = String(digits.suffix(4))
+            }
+        }
+        return c
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    livePreview
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 8, trailing: 0))
+                        .listRowBackground(Color.clear)
+                }
+
                 Section {
                     Picker("Type", selection: $kind) {
                         ForEach(CardKind.allCases) { Text($0.label).tag($0) }
@@ -150,6 +183,41 @@ struct CardFormView: View {
             }
             .onAppear(perform: configureOnAppear)
         }
+        // Écran de célébration par-dessus le formulaire ; sa fermeture
+        // enchaîne sur le dismiss habituel (retour à l'accueil + mise en avant).
+        .overlay {
+            if let savedCardName {
+                CardSavedSuccessView(cardName: savedCardName) {
+                    dismiss()
+                }
+                .transition(.opacity)
+                .zIndex(20)
+            }
+        }
+        .animation(Motion.standard, value: savedCardName != nil)
+    }
+
+    /// Aperçu en direct : mini-carte bancaire réaliste, ou tuile pour les autres
+    /// types, qui reflète immédiatement le nom, la couleur et le code saisis.
+    private var livePreview: some View {
+        VStack(spacing: 10) {
+            Group {
+                if kind == .bank {
+                    RealisticCardView(card: previewCard, revealedNumber: nil)
+                } else {
+                    CardPreviewTile(card: previewCard)
+                }
+            }
+            .animation(Motion.snappy, value: colorHex)
+            .animation(Motion.snappy, value: kind)
+
+            Text("Aperçu")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
     }
 
     private var loyaltySection: some View {
@@ -216,9 +284,16 @@ struct CardFormView: View {
                     .frame(width: 38, height: 38)
                     .overlay {
                         if hex == colorHex {
-                            Circle().strokeBorder(.primary, lineWidth: 3)
+                            ZStack {
+                                Circle().strokeBorder(Color.white, lineWidth: 2.5)
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(Color.white)
+                            }
+                            .transition(.popIn)
                         }
                     }
+                    .scaleEffect(hex == colorHex ? 1.1 : 1)
                     .onTapGesture {
                         Haptics.selection()
                         withAnimation(Motion.snappy) { colorHex = hex }
@@ -278,14 +353,80 @@ struct CardFormView: View {
         let number = fullNumber.isEmpty ? nil : fullNumber
         do {
             try store.upsert(updated, fullNumber: number)
-            Haptics.success()
-            dismiss()
+            // On n'appelle plus dismiss() ici : à la création, on montre
+            // d'abord l'écran de succès, qui fera le dismiss à la fin. En
+            // édition, on ferme directement (pas de célébration nécessaire).
+            if isEditing {
+                Haptics.success()
+                dismiss()
+            } else {
+                withAnimation(Motion.standard) {
+                    savedCardName = updated.name
+                }
+            }
         } catch {
             Haptics.error()
             withAnimation(Motion.snappy) {
                 saveError = (error as? LocalizedError)?.errorDescription
                     ?? "Impossible d'enregistrer la carte."
             }
+        }
+    }
+}
+
+/// Aperçu compact d'une carte de fidélité / autre, réutilisant le style visuel
+/// de la tuile d'accueil sans dépendre de l'état de surlignage.
+private struct CardPreviewTile: View {
+    let card: Card
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: card.kind == .other ? "rectangle.stack.fill" : "barcode")
+                    .foregroundStyle(.white.opacity(0.9))
+                Spacer()
+                Text(card.kind.label)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.white.opacity(0.18), in: Capsule())
+            }
+
+            Spacer()
+
+            Text(card.name.isEmpty ? "Nom de la carte" : card.name)
+                .font(.headline)
+                .foregroundStyle(card.name.isEmpty ? Color.white.opacity(0.5) : Color.white)
+                .lineLimit(1)
+
+            Text(subtitle)
+                .font(.subheadline.monospaced())
+                .foregroundStyle(.white.opacity(0.85))
+                .lineLimit(1)
+        }
+        .padding(18)
+        .frame(height: 130)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [Color(hex: card.colorHex), Color(hex: card.colorHex).opacity(0.75)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
+    }
+
+    private var subtitle: String {
+        switch card.kind {
+        case .loyalty:
+            return card.code.isEmpty ? "Numéro / code" : card.code
+        case .other:
+            return card.code.isEmpty ? "Carte" : card.code
+        case .bank:
+            return "•••• \(card.lastFour.isEmpty ? "••••" : card.lastFour)"
         }
     }
 }
