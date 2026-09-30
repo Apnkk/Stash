@@ -151,7 +151,7 @@ struct AppearTransitionModifier: ViewModifier {
             .opacity(visible ? 1 : 0)
             .offset(y: visible ? 0 : 16)
             .onAppear {
-                withAnimation(Motion.staggered(.soft, index: index, step: step)) {
+                withAnimation(Motion.staggered(Motion.soft, index: index, step: step)) {
                     visible = true
                 }
             }
