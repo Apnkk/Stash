@@ -246,6 +246,7 @@ struct CardFormView: View {
         }
     }
 
+    @ViewBuilder
     private var bankSection: some View {
         Section {
             HStack {

@@ -12,6 +12,7 @@
 		A10000000000000000000103 /* SecureVault.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* SecureVault.swift */; };
 		A10000000000000000000104 /* BiometricAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* BiometricAuth.swift */; };
 		A10000000000000000000105 /* BarcodeGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000005 /* BarcodeGenerator.swift */; };
+		A10000000000000000000113 /* BINDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* BINDatabase.swift */; };
 		A10000000000000000000106 /* CardStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000006 /* CardStore.swift */; };
 		A10000000000000000000107 /* LockScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000007 /* LockScreenView.swift */; };
 		A10000000000000000000108 /* CardListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000008 /* CardListView.swift */; };
@@ -33,6 +34,7 @@
 		A10000000000000000000003 /* SecureVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureVault.swift; sourceTree = "<group>"; };
 		A10000000000000000000004 /* BiometricAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricAuth.swift; sourceTree = "<group>"; };
 		A10000000000000000000005 /* BarcodeGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarcodeGenerator.swift; sourceTree = "<group>"; };
+		A10000000000000000000015 /* BINDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BINDatabase.swift; sourceTree = "<group>"; };
 		A10000000000000000000006 /* CardStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardStore.swift; sourceTree = "<group>"; };
 		A10000000000000000000007 /* LockScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenView.swift; sourceTree = "<group>"; };
 		A10000000000000000000008 /* CardListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardListView.swift; sourceTree = "<group>"; };
@@ -120,6 +122,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000005 /* BarcodeGenerator.swift */,
+				A10000000000000000000015 /* BINDatabase.swift */,
 				A10000000000000000000006 /* CardStore.swift */,
 			);
 			path = Services;
@@ -218,6 +221,7 @@
 				A10000000000000000000103 /* SecureVault.swift in Sources */,
 				A10000000000000000000104 /* BiometricAuth.swift in Sources */,
 				A10000000000000000000105 /* BarcodeGenerator.swift in Sources */,
+				A10000000000000000000113 /* BINDatabase.swift in Sources */,
 				A10000000000000000000106 /* CardStore.swift in Sources */,
 				A10000000000000000000107 /* LockScreenView.swift in Sources */,
 				A10000000000000000000108 /* CardListView.swift in Sources */,
