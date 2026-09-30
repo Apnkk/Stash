@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import Combine
+import UniformTypeIdentifiers
 
 /// Vue plein écran d'une carte.
 /// - Fidélité : affiche le code-barres / QR en grand pour le scan en caisse.
@@ -20,6 +21,11 @@ struct CardDetailView: View {
     @State private var shareImage: UIImage?
     @State private var showingShare = false
     @State private var isCaptured = UIScreen.main.isCaptured
+
+    /// Image du code-barres / QR, générée une seule fois par carte (CoreImage
+    /// + rendu CGImage sont coûteux : on évite de la recalculer à chaque rendu
+    /// et à chaque appel de bouton). Recalculée si le code de la carte change.
+    @State private var barcodeImage: UIImage?
 
     /// Tâche d'auto-masquage : re-masque le numéro après un délai d'inactivité.
     @State private var autoHideTask: Task<Void, Never>?
@@ -69,7 +75,15 @@ struct CardDetailView: View {
             if card.kind != .bank {
                 previousBrightness = UIScreen.main.brightness
                 UIScreen.main.brightness = 1.0
+                regenerateBarcodeIfNeeded()
             }
+        }
+        .onChange(of: currentCard.code) { _, _ in
+            // Après une édition qui change le code, on régénère l'image.
+            if card.kind != .bank { regenerateBarcodeIfNeeded() }
+        }
+        .onChange(of: currentCard.format) { _, _ in
+            if card.kind != .bank { regenerateBarcodeIfNeeded() }
         }
         .onDisappear {
             if card.kind != .bank {
@@ -130,7 +144,7 @@ struct CardDetailView: View {
 
     private var loyaltyContent: some View {
         VStack(spacing: 16) {
-            if let image = BarcodeGenerator.image(for: currentCard) {
+            if let image = barcodeImage {
                 Image(uiImage: image)
                     .interpolation(.none)
                     .resizable()
@@ -176,7 +190,7 @@ struct CardDetailView: View {
                 }
                 .glassButtonIfAvailable()
                 .pressable()
-                .disabled(BarcodeGenerator.image(for: currentCard) == nil)
+                .disabled(barcodeImage == nil)
             }
 
             Text("Présente ce code au lecteur en caisse.")
@@ -349,7 +363,20 @@ struct CardDetailView: View {
 
     private func copyNumber() {
         guard let number = revealedNumber else { return }
-        UIPasteboard.general.string = number.filter(\.isNumber)
+        let digits = number.filter(\.isNumber)
+
+        // On marque le contenu comme local (jamais synchronisé via Handoff /
+        // Universal Clipboard vers un autre appareil) et éphémère : iOS efface
+        // l'élément après 90 s même si l'app est fermée. C'est une donnée
+        // bancaire sensible, elle ne doit pas traîner dans le presse-papiers.
+        UIPasteboard.general.setItems(
+            [[UTType.utf8PlainText.identifier: digits]],
+            options: [
+                .localOnly: true,
+                .expirationDate: Date().addingTimeInterval(90)
+            ]
+        )
+
         Haptics.success()
         withAnimation(Motion.snappy) { copied = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
@@ -367,9 +394,15 @@ struct CardDetailView: View {
     }
 
     private func shareCode() {
-        guard let image = BarcodeGenerator.image(for: currentCard) else { return }
+        guard let image = barcodeImage else { return }
         shareImage = image
         showingShare = true
+    }
+
+    /// (Re)génère l'image du code-barres pour la carte courante. Appelée à
+    /// l'apparition et après une édition qui modifie le code ou le format.
+    private func regenerateBarcodeIfNeeded() {
+        barcodeImage = BarcodeGenerator.image(for: currentCard)
     }
 }
 
