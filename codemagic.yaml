@@ -4,25 +4,29 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
-      xcode: latest
+      xcode: 26.0.1
       vars:
         SCHEME: "Stash"
         BUNDLE_ID: "com.ares.stash"
     scripts:
-      - name: Select Xcode 26 (SDK iOS 26 / Liquid Glass)
+      - name: Verify Xcode 26 (SDK iOS 26 / Liquid Glass requis)
         script: |
           set -euo pipefail
-          # Sélectionne le Xcode le plus récent disponible ; vise Xcode 26 si présent.
-          XCODE_APP=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)
-          if [ -z "$XCODE_APP" ]; then
-            echo "Xcode 26 introuvable sur cette machine. Xcode disponibles :"
-            ls -d /Applications/Xcode*.app
-            echo "Utilise le Xcode par défaut à la place."
-            XCODE_APP=$(ls -d /Applications/Xcode.app 2>/dev/null || true)
-          fi
-          echo "Sélection de $XCODE_APP"
-          sudo xcode-select -switch "$XCODE_APP"
+          # Codemagic sélectionne déjà Xcode via `environment: xcode: 26.0`.
+          # On VÉRIFIE que c'est bien du Xcode 26 : l'app utilise des API iOS 26
+          # (.glass / .glassProminent / .glassEffect) qui n'existent que dans le
+          # SDK iOS 26. Compiler avec un Xcode plus ancien => erreurs CompileSwift.
+          echo "Xcode sélectionné :"
           xcodebuild -version
+          XCODE_MAJOR=$(xcodebuild -version | head -1 | sed -E 's/Xcode ([0-9]+).*/\1/')
+          if [ "$XCODE_MAJOR" -lt 26 ]; then
+            echo "ERREUR : Xcode $XCODE_MAJOR détecté, mais Xcode 26 est requis (SDK iOS 26)."
+            echo "Change 'xcode: 26.0.1' dans codemagic.yaml pour une version 26.x disponible (ex. 26.0, 26.1)."
+            echo "Versions Xcode présentes sur cette machine :"
+            ls -d /Applications/Xcode*.app 2>/dev/null || true
+            exit 1
+          fi
+          echo "SDK iOS disponibles :"
           xcodebuild -showsdks | grep -i ios || true
 
       - name: Generate app icon
