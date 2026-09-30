@@ -5,6 +5,7 @@ struct CardListView: View {
     @EnvironmentObject private var store: CardStore
 
     @State private var showingForm = false
+    @State private var showingTypePicker = false
     @State private var editingCard: Card?
     @State private var searchText = ""
     @State private var showingSettings = false
@@ -40,8 +41,7 @@ struct CardListView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         Haptics.medium()
-                        editingCard = nil
-                        showingForm = true
+                        showingTypePicker = true
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -51,6 +51,10 @@ struct CardListView: View {
             .searchable(text: $searchText, prompt: "Rechercher une carte")
             .sheet(isPresented: $showingForm) {
                 CardFormView(card: editingCard)
+                    .environmentObject(store)
+            }
+            .sheet(isPresented: $showingTypePicker) {
+                AddCardTypeView()
                     .environmentObject(store)
             }
             .sheet(isPresented: $showingSettings) {
@@ -108,8 +112,7 @@ struct CardListView: View {
 
     private var emptyState: some View {
         EmptyStateView {
-            editingCard = nil
-            showingForm = true
+            showingTypePicker = true
         }
     }
 }

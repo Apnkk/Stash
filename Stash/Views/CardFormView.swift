@@ -8,7 +8,12 @@ struct CardFormView: View {
     /// Carte à modifier, ou `nil` pour une création.
     let card: Card?
 
+    /// Type imposé à la création (choisi sur l'écran précédent). En édition,
+    /// c'est le type de la carte qui prime. `nil` = ancien comportement.
+    var presetKind: CardKind? = nil
+
     @State private var kind: CardKind = .loyalty
+    @State private var kindLocked = false
     @State private var name = ""
     @State private var colorHex = Palette.colors[0]
 
@@ -75,7 +80,9 @@ struct CardFormView: View {
                         ForEach(CardKind.allCases) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    .disabled(isEditing) // on ne change pas le type d'une carte existante
+                    // On ne change pas le type d'une carte existante, ni celui
+                    // choisi sur l'écran de sélection précédent.
+                    .disabled(isEditing || kindLocked)
 
                     TextField("Nom de la carte", text: $name)
                         .textInputAutocapitalization(.words)
@@ -138,7 +145,7 @@ struct CardFormView: View {
             } message: {
                 Text("Cette action est définitive.")
             }
-            .onAppear(perform: loadIfEditing)
+            .onAppear(perform: configureOnAppear)
         }
     }
 
@@ -212,6 +219,16 @@ struct CardFormView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    /// Configure le formulaire à l'apparition : type imposé pour une création,
+    /// ou chargement des champs pour une édition.
+    private func configureOnAppear() {
+        if card == nil, let presetKind {
+            kind = presetKind
+            kindLocked = true
+        }
+        loadIfEditing()
     }
 
     private func loadIfEditing() {
