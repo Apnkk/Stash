@@ -129,8 +129,11 @@ final class CardStore: ObservableObject {
     }
 
     /// Importe des cartes depuis un JSON exporté. Fusionne par `id`
-    /// (remplace une carte existante, ajoute les nouvelles). Renvoie le
-    /// nombre de cartes importées, ou `nil` si le format est invalide.
+    /// (remplace une carte existante, ajoute les nouvelles). Chaque carte est
+    /// validée avant d'être acceptée : une carte incohérente (nom vide, date
+    /// d'expiration invalide) est ignorée plutôt qu'injectée telle quelle.
+    /// - Returns: le nombre de cartes réellement importées, ou `nil` si le
+    ///   format global du fichier est invalide (rien n'a pu être décodé).
     @discardableResult
     func importData(_ data: Data) -> Int? {
         let decoder = JSONDecoder()
@@ -138,14 +141,50 @@ final class CardStore: ObservableObject {
         guard let imported = try? decoder.decode([Card].self, from: data) else {
             return nil
         }
-        for card in imported {
+
+        var accepted = 0
+        for card in imported where isImportable(card) {
             if let idx = cards.firstIndex(where: { $0.id == card.id }) {
                 cards[idx] = card
             } else {
                 cards.append(card)
             }
+            accepted += 1
         }
         persist()
-        return imported.count
+        purgeOrphanSecrets()
+        return accepted
+    }
+
+    /// Supprime du Keychain les secrets (numéros de CB) qui n'ont plus de carte
+    /// correspondante dans la liste. Utile après un import ou une suppression
+    /// dont l'effacement du secret aurait échoué silencieusement. Ne touche
+    /// jamais les secrets encore rattachés à une carte existante.
+    func purgeOrphanSecrets() {
+        let liveIDs = Set(cards.map { $0.id.uuidString })
+        for key in SecureVault.allKeys() where !liveIDs.contains(key) {
+            try? SecureVault.delete(key)
+        }
+    }
+
+    /// Contrôle de cohérence minimal d'une carte reçue par import, pour ne pas
+    /// laisser entrer de données bancales dans le store.
+    private func isImportable(_ card: Card) -> Bool {
+        // Un nom non vide est indispensable pour l'affichage.
+        guard !card.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+        // Si une date d'expiration est renseignée, elle doit être parsable
+        // (on n'exige pas qu'elle soit future : une carte expirée reste
+        // légitimement archivable par l'utilisateur).
+        if card.kind == .bank, !card.expiry.isEmpty {
+            let parts = card.expiry.split(separator: "/")
+            guard parts.count == 2,
+                  let month = Int(parts[0]), (1...12).contains(month),
+                  Int(parts[1]) != nil else {
+                return false
+            }
+        }
+        return true
     }
 }

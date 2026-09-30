@@ -250,20 +250,49 @@ enum Palette {
 }
 
 extension Color {
-    /// Crée une `Color` à partir d'une chaîne hexadécimale (#RRGGBB).
+    /// Crée une `Color` à partir d'une chaîne hexadécimale.
+    /// Formats acceptés : `#RGB`, `#RRGGBB`, `#RRGGBBAA` (le `#` est optionnel).
+    /// Une chaîne invalide retombe sur la couleur d'accent de l'app plutôt
+    /// que sur un bleu arbitraire, pour rester cohérent avec le thème.
     init(hex: String) {
-        let cleaned = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        var value: UInt64 = 0
-        Scanner(string: cleaned).scanHexInt64(&value)
-        let r, g, b: Double
-        if cleaned.count == 6 {
-            r = Double((value & 0xFF0000) >> 16) / 255.0
-            g = Double((value & 0x00FF00) >> 8) / 255.0
-            b = Double(value & 0x0000FF) / 255.0
-        } else {
-            r = 0.3; g = 0.55; b = 1.0
+        let cleaned = hex
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+
+        // On vérifie que tout est hexadécimal ET que la longueur est connue.
+        let isHex = !cleaned.isEmpty
+            && cleaned.allSatisfy { $0.isHexDigit }
+            && [3, 6, 8].contains(cleaned.count)
+
+        guard isHex else {
+            // Repli sur le rouge d'accent (thème rouge/noir) au lieu d'un bleu hors-sujet.
+            self.init(.sRGB, red: 0.882, green: 0.180, blue: 0.235, opacity: 1.0)
+            return
         }
-        self.init(.sRGB, red: r, green: g, blue: b, opacity: 1.0)
+
+        // On normalise en 8 chiffres (RRGGBBAA) pour un seul chemin de calcul.
+        let normalized: String
+        switch cleaned.count {
+        case 3:
+            // #RGB -> #RRGGBBFF
+            normalized = cleaned.map { "\($0)\($0)" }.joined() + "FF"
+        case 6:
+            // #RRGGBB -> #RRGGBBFF
+            normalized = cleaned + "FF"
+        default:
+            // Déjà #RRGGBBAA
+            normalized = cleaned
+        }
+
+        var value: UInt64 = 0
+        Scanner(string: normalized).scanHexInt64(&value)
+
+        let r = Double((value & 0xFF00_0000) >> 24) / 255.0
+        let g = Double((value & 0x00FF_0000) >> 16) / 255.0
+        let b = Double((value & 0x0000_FF00) >> 8) / 255.0
+        let a = Double(value & 0x0000_00FF) / 255.0
+
+        self.init(.sRGB, red: r, green: g, blue: b, opacity: a)
     }
 
     /// Couleur d'accent de l'app (thème rouge/noir), utilisée comme tint global.

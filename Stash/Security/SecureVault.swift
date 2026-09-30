@@ -109,6 +109,30 @@ enum SecureVault {
         }
     }
 
+    /// Liste toutes les clés (comptes) actuellement stockées dans ce service.
+    /// Ne déclenche PAS de prompt biométrique : on ne lit que les attributs
+    /// (les comptes), jamais les données secrètes elles-mêmes.
+    /// - Returns: l'ensemble des clés présentes (vide si aucune ou si le
+    ///   trousseau est inaccessible).
+    static func allKeys() -> Set<String> {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        guard status == errSecSuccess,
+              let items = result as? [[String: Any]] else {
+            return []
+        }
+
+        return Set(items.compactMap { $0[kSecAttrAccount as String] as? String })
+    }
+
     /// Supprime le secret associé à une clé. Ne déclenche pas de prompt.
     @discardableResult
     static func delete(_ key: String) throws -> Bool {
