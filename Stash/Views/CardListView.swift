@@ -198,6 +198,26 @@ struct CardTileView: View {
 
     @State private var glow = false
 
+    /// Couleurs de fond de la vignette : dégradé de marque de la banque
+    /// détectée si l'utilisateur a gardé la couleur par défaut, sinon sa
+    /// couleur personnalisée.
+    private var tileColors: [Color] {
+        let usesDefaultColor = card.colorHex.uppercased() == "#D62836"
+        if card.kind == .bank, usesDefaultColor {
+            // Un design de réseau choisi à la main prime sur la banque détectée.
+            let manual = CardNetwork(rawValue: card.manualNetworkRaw)
+            if let manual, manual != .unknown {
+                return manual.brandColors.map { Color(hex: $0) }
+            }
+            if !card.bankColorHex.isEmpty {
+                let base = Color(hex: card.bankColorHex)
+                return [base, base.opacity(0.78)]
+            }
+        }
+        let base = Color(hex: card.colorHex)
+        return [base, base.opacity(0.75)]
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -209,20 +229,35 @@ struct CardTileView: View {
                         .foregroundStyle(.white.opacity(0.9))
                 }
                 Spacer()
-                Text(card.kind.label)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(.white.opacity(0.18), in: Capsule())
+                // Logo réseau (Visa/Mastercard/…) figé à la saisie, sinon le
+                // libellé du type de carte.
+                if card.kind == .bank, card.network != .unknown {
+                    tileNetworkLogo
+                } else {
+                    Text(card.kind.label)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(.white.opacity(0.18), in: Capsule())
+                }
             }
 
             Spacer()
 
-            Text(card.name)
-                .font(.headline)
-                .foregroundStyle(.white)
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(card.name)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
+                if card.kind == .bank, !card.bankName.isEmpty {
+                    Text(card.bankName)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(1)
+                }
+            }
 
             Text(subtitle)
                 .font(.subheadline.monospaced())
@@ -234,7 +269,7 @@ struct CardTileView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             LinearGradient(
-                colors: [Color(hex: card.colorHex), Color(hex: card.colorHex).opacity(0.75)],
+                colors: tileColors,
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -271,6 +306,29 @@ struct CardTileView: View {
         .onAppear {
             // Cas où la tuile apparaît déjà surlignée (retour direct sur l'accueil).
             if isHighlighted { glow = true }
+        }
+    }
+
+    /// Logo réseau miniature affiché en haut à droite de la vignette bancaire,
+    /// cohérent avec celui de RealisticCardView.
+    @ViewBuilder
+    private var tileNetworkLogo: some View {
+        switch card.network {
+        case .mastercard:
+            HStack(spacing: -7) {
+                Circle().fill(Color(hex: "#EB001B")).frame(width: 18, height: 18)
+                Circle().fill(Color(hex: "#F79E1B").opacity(0.9)).frame(width: 18, height: 18)
+            }
+        case .visa, .amex, .discover:
+            Text(card.network == .amex ? "AMEX" : card.network.label)
+                .font(.caption2.weight(.heavy))
+                .italic(card.network == .visa)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(.white.opacity(0.18), in: Capsule())
+        case .unknown:
+            EmptyView()
         }
     }
 

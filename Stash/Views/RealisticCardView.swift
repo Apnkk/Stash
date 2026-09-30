@@ -11,9 +11,13 @@ struct RealisticCardView: View {
     /// Numéro complet déjà déchiffré, ou `nil` pour l'affichage masqué.
     var revealedNumber: String? = nil
 
-    /// Réseau à utiliser pour l'apparence : déduit du numéro révélé si on
-    /// l'a, sinon `.unknown` (les 4 derniers chiffres ne suffisent pas).
+    /// Réseau à utiliser pour l'apparence : d'abord celui figé à la saisie
+    /// (persisté, non sensible), sinon détecté depuis le numéro révélé s'il
+    /// est fourni. Permet d'afficher le bon logo même à l'accueil.
     private var network: CardNetwork {
+        if card.network != .unknown {
+            return card.network
+        }
         if let number = revealedNumber {
             return CardNetwork.detect(from: number)
         }
@@ -21,14 +25,33 @@ struct RealisticCardView: View {
     }
 
     /// L'utilisateur a-t-il gardé la couleur par défaut ? Si oui, on habille
-    /// la carte avec le dégradé de marque du réseau détecté.
+    /// la carte avec le dégradé de marque de la banque (prioritaire) ou du
+    /// réseau détecté.
     private var usesDefaultColor: Bool {
         card.colorHex.uppercased() == "#D62836"
     }
 
+    /// L'utilisateur a-t-il choisi un design de réseau manuellement ? Dans ce
+    /// cas ses couleurs de marque priment sur celles de la banque détectée.
+    private var hasManualNetwork: Bool {
+        CardNetwork(rawValue: card.manualNetworkRaw).map { $0 != .unknown } ?? false
+    }
+
     private var gradientColors: [Color] {
-        if usesDefaultColor, network != .unknown {
-            return network.brandColors.map { Color(hex: $0) }
+        if usesDefaultColor {
+            // Un design de réseau choisi à la main prime sur la banque détectée.
+            if hasManualNetwork, network != .unknown {
+                return network.brandColors.map { Color(hex: $0) }
+            }
+            // Sinon, priorité aux couleurs de la banque détectée (persistées),
+            // puis au dégradé du réseau.
+            if !card.bankColorHex.isEmpty {
+                let base = Color(hex: card.bankColorHex)
+                return [base, base.opacity(0.78)]
+            }
+            if network != .unknown {
+                return network.brandColors.map { Color(hex: $0) }
+            }
         }
         let base = Color(hex: card.colorHex)
         return [base, base.opacity(0.72)]
@@ -60,10 +83,18 @@ struct RealisticCardView: View {
             VStack(alignment: .leading, spacing: 0) {
                 // Ligne du haut : nom donné par l'utilisateur + logo réseau.
                 HStack(alignment: .top) {
-                    Text(card.name)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.92))
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(card.name)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.92))
+                            .lineLimit(1)
+                        if !card.bankName.isEmpty {
+                            Text(card.bankName)
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .lineLimit(1)
+                        }
+                    }
                     Spacer()
                     networkLogo
                 }

@@ -30,6 +30,10 @@ struct CardFormView: View {
     @State private var holder = ""
     @State private var expiry = ""
 
+    /// Design/réseau choisi manuellement par l'utilisateur. `.unknown` =
+    /// « Automatique » (on laisse la détection depuis le numéro décider).
+    @State private var manualNetwork: CardNetwork = .unknown
+
     // Commun
     @State private var note = ""
 
@@ -96,8 +100,13 @@ struct CardFormView: View {
         if kind == .bank {
             let digits = fullNumber.filter(\.isNumber)
             if !digits.isEmpty {
+                let brand = BINDatabase.brandInfo(for: digits)
                 c.lastFour = String(digits.suffix(4))
+                c.networkRaw = CardNetwork.detect(from: digits).rawValue
+                c.bankName = brand.bankName ?? ""
+                c.bankColorHex = brand.brandColors?.first ?? ""
             }
+            c.manualNetworkRaw = manualNetwork == .unknown ? "" : manualNetwork.rawValue
         }
         return c
     }
@@ -274,6 +283,25 @@ struct CardFormView: View {
         } footer: {
             Text("Le numéro complet est chiffré dans le trousseau (Keychain) et n'est jamais envoyé sur un serveur. Il reste masqué et n'est révélé qu'après Face ID / Touch ID.")
         }
+
+        Section {
+            networkDesignPicker
+        } header: {
+            Text("Design de la carte")
+        } footer: {
+            Text("« Automatique » utilise le réseau détecté depuis le numéro. Choisis un réseau pour forcer le logo et les couleurs affichés.")
+        }
+    }
+
+    /// Choix manuel du design de réseau (Visa/Mastercard/Amex/Discover), ou
+    /// « Automatique » pour laisser la détection depuis le numéro décider.
+    private var networkDesignPicker: some View {
+        Picker("Réseau", selection: $manualNetwork) {
+            Text("Automatique").tag(CardNetwork.unknown)
+            ForEach(CardNetwork.selectable) { net in
+                Text(net.label).tag(net)
+            }
+        }
     }
 
     private var colorPicker: some View {
@@ -325,6 +353,8 @@ struct CardFormView: View {
         holder = card.holder
         expiry = card.expiry
         note = card.note
+        // Choix de design manuel déjà enregistré ("" -> Automatique).
+        manualNetwork = CardNetwork(rawValue: card.manualNetworkRaw) ?? .unknown
         // On ne pré-remplit jamais le numéro complet : il reste dans le Keychain.
     }
 
@@ -349,6 +379,27 @@ struct CardFormView: View {
         updated.holder = holder.trimmingCharacters(in: .whitespaces)
         updated.expiry = expiry.trimmingCharacters(in: .whitespaces)
         updated.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Fige la marque (réseau + banque) tant que le numéro complet est en
+        // clair ici. Ces champs ne sont PAS sensibles et évitent de relire le
+        // Keychain à l'accueil. En édition sans nouveau numéro, on conserve la
+        // marque déjà enregistrée.
+        if kind == .bank {
+            let digits = fullNumber.filter(\.isNumber)
+            if !digits.isEmpty {
+                let brand = BINDatabase.brandInfo(for: digits)
+                updated.networkRaw = CardNetwork.detect(from: digits).rawValue
+                updated.bankName = brand.bankName ?? ""
+                updated.bankColorHex = brand.brandColors?.first ?? ""
+            }
+            // Choix de design manuel : "" = Automatique (on laisse networkRaw décider).
+            updated.manualNetworkRaw = manualNetwork == .unknown ? "" : manualNetwork.rawValue
+        } else {
+            updated.networkRaw = ""
+            updated.manualNetworkRaw = ""
+            updated.bankName = ""
+            updated.bankColorHex = ""
+        }
 
         let number = fullNumber.isEmpty ? nil : fullNumber
         do {

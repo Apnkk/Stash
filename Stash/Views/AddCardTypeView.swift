@@ -45,10 +45,18 @@ struct AddCardTypeView: View {
                     Button("Annuler") { dismiss() }
                 }
             }
-            // Navigation vers le formulaire une fois le type choisi.
+            // Navigation une fois le type choisi : les cartes bancaires passent
+            // par le flux guidé façon Wallet (étape par étape) ; les autres
+            // types gardent le formulaire classique.
             .navigationDestination(item: $selectedKind) { kind in
-                CardFormView(card: nil, presetKind: kind)
-                    .environmentObject(store)
+                Group {
+                    if kind == .bank {
+                        AddBankCardFlowView()
+                    } else {
+                        CardFormView(card: nil, presetKind: kind)
+                    }
+                }
+                .environmentObject(store)
             }
             // Carte enregistrée : on ferme toute la feuille pour revenir
             // directement à l'accueil, où la nouvelle carte est mise en avant.

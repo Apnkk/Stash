@@ -39,12 +39,18 @@ enum BarcodeFormat: String, Codable, CaseIterable, Identifiable {
 }
 
 /// Réseau d'une carte bancaire, déduit du préfixe du numéro (règles IIN simplifiées).
-enum CardNetwork: String, Codable {
+enum CardNetwork: String, Codable, CaseIterable, Identifiable {
     case visa
     case mastercard
     case amex
     case discover
     case unknown
+
+    var id: String { rawValue }
+
+    /// Réseaux proposés au choix manuel de l'utilisateur (hors `.unknown`, qui
+    /// représente « aucun / automatique »).
+    static var selectable: [CardNetwork] { [.visa, .mastercard, .amex, .discover] }
 
     var label: String {
         switch self {
@@ -183,6 +189,26 @@ struct Card: Identifiable, Codable, Equatable {
     var expiry: String               // MM/AA
     var lastFour: String             // 4 derniers chiffres, affichés masqués
 
+    /// Réseau figé à la saisie (Visa/Mastercard/…), stocké en clair car non
+    /// sensible. Permet d'afficher le bon logo à l'accueil sans relire le
+    /// Keychain (qui exigerait Face ID sur chaque vignette).
+    var networkRaw: String           // CardNetwork.rawValue, "" si inconnu
+
+    /// Réseau/design choisi MANUELLEMENT par l'utilisateur dans le formulaire
+    /// (Visa/Mastercard/Amex/Discover). Prime sur la détection automatique quand
+    /// il est renseigné. Vide = « Automatique » (on retombe sur `networkRaw`).
+    /// Non sensible : c'est une préférence d'apparence, pas le numéro.
+    var manualNetworkRaw: String
+
+    /// Banque émettrice détectée hors-ligne à la saisie (ex. « BNP Paribas »),
+    /// ou chaîne vide. Non sensible : c'est une info de marque, pas le numéro.
+    var bankName: String
+
+    /// Couleur de marque principale de la banque détectée (hex), figée à la
+    /// saisie. Vide si banque inconnue. Permet d'habiller la carte à l'accueil
+    /// sans avoir le BIN complet (on ne garde que les 4 derniers chiffres).
+    var bankColorHex: String
+
     // --- Communs ---
     var note: String                 // note libre de l'utilisateur
     var createdAt: Date              // date d'ajout
@@ -197,6 +223,10 @@ struct Card: Identifiable, Codable, Equatable {
         holder: String = "",
         expiry: String = "",
         lastFour: String = "",
+        networkRaw: String = "",
+        manualNetworkRaw: String = "",
+        bankName: String = "",
+        bankColorHex: String = "",
         note: String = "",
         createdAt: Date = Date()
     ) {
@@ -209,6 +239,10 @@ struct Card: Identifiable, Codable, Equatable {
         self.holder = holder
         self.expiry = expiry
         self.lastFour = lastFour
+        self.networkRaw = networkRaw
+        self.manualNetworkRaw = manualNetworkRaw
+        self.bankName = bankName
+        self.bankColorHex = bankColorHex
         self.note = note
         self.createdAt = createdAt
     }
@@ -216,7 +250,7 @@ struct Card: Identifiable, Codable, Equatable {
     // Décodage tolérant : les cartes déjà enregistrées (avant l'ajout de
     // `note`/`createdAt`) ne possèdent pas ces clés → valeurs par défaut.
     enum CodingKeys: String, CodingKey {
-        case id, kind, name, colorHex, code, format, holder, expiry, lastFour, note, createdAt
+        case id, kind, name, colorHex, code, format, holder, expiry, lastFour, networkRaw, manualNetworkRaw, bankName, bankColorHex, note, createdAt
     }
 
     init(from decoder: Decoder) throws {
@@ -230,13 +264,24 @@ struct Card: Identifiable, Codable, Equatable {
         holder   = try c.decodeIfPresent(String.self, forKey: .holder) ?? ""
         expiry   = try c.decodeIfPresent(String.self, forKey: .expiry) ?? ""
         lastFour = try c.decodeIfPresent(String.self, forKey: .lastFour) ?? ""
+        networkRaw = try c.decodeIfPresent(String.self, forKey: .networkRaw) ?? ""
+        manualNetworkRaw = try c.decodeIfPresent(String.self, forKey: .manualNetworkRaw) ?? ""
+        bankName = try c.decodeIfPresent(String.self, forKey: .bankName) ?? ""
+        bankColorHex = try c.decodeIfPresent(String.self, forKey: .bankColorHex) ?? ""
         note     = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
     }
 
-    /// Réseau bancaire déduit des 4 derniers chiffres n'est pas fiable ;
-    /// on ne l'estime qu'à partir d'un numéro complet, au moment de la saisie.
-    var networkFromLastFour: CardNetwork { .unknown }
+    /// Réseau bancaire utilisé pour l'apparence. Priorité au choix MANUEL de
+    /// l'utilisateur ; à défaut, réseau figé à la saisie (détecté du numéro).
+    /// Repli sur `.unknown` pour les cartes enregistrées avant l'ajout de ce
+    /// champ (re-détectées à la prochaine édition, ou dégradé personnalisé).
+    var network: CardNetwork {
+        if let manual = CardNetwork(rawValue: manualNetworkRaw), manual != .unknown {
+            return manual
+        }
+        return CardNetwork(rawValue: networkRaw) ?? .unknown
+    }
 }
 
 /// Palette de couleurs proposée à l'ajout d'une carte.
