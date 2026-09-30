@@ -77,6 +77,27 @@ enum CardNetwork: String, Codable {
         case .unknown:    return Set(12...19)
         }
     }
+
+    /// Nombre de chiffres regroupés par bloc pour l'affichage du numéro.
+    /// Amex se présente en 4-6-5 ; les autres réseaux en groupes de 4.
+    var groupSizes: [Int] {
+        switch self {
+        case .amex: return [4, 6, 5]
+        default:    return [4, 4, 4, 4]
+        }
+    }
+
+    /// Dégradé de marque affiché sur la carte réaliste quand l'utilisateur
+    /// n'a pas choisi de couleur personnalisée (couleur par défaut).
+    var brandColors: [String] {
+        switch self {
+        case .visa:       return ["#1A1F71", "#2A4BD7"]
+        case .mastercard: return ["#EB001B", "#F79E1B"]
+        case .amex:       return ["#016FD0", "#28B0E5"]
+        case .discover:   return ["#F27712", "#FFA630"]
+        case .unknown:    return ["#3A3A3C", "#1C1C1E"]
+        }
+    }
 }
 
 /// Validation d'un numéro de carte bancaire type Apple Wallet.

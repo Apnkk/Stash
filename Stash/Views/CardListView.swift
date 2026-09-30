@@ -129,8 +129,13 @@ struct CardTileView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: card.kind == .bank ? "creditcard.fill" : "barcode")
-                    .foregroundStyle(.white.opacity(0.9))
+                if card.kind == .bank {
+                    // Puce EMV miniature, pour évoquer la carte physique.
+                    miniChip
+                } else {
+                    Image(systemName: "barcode")
+                        .foregroundStyle(.white.opacity(0.9))
+                }
                 Spacer()
                 Text(card.kind.label)
                     .font(.caption2.weight(.semibold))
@@ -148,7 +153,7 @@ struct CardTileView: View {
                 .lineLimit(1)
 
             Text(subtitle)
-                .font(.subheadline)
+                .font(.subheadline.monospaced())
                 .foregroundStyle(.white.opacity(0.85))
                 .lineLimit(1)
         }
@@ -172,6 +177,28 @@ struct CardTileView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
+    }
+
+    /// Puce EMV miniature dorée, cohérente avec RealisticCardView.
+    private var miniChip: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: "#E7C766"), Color(hex: "#B8912F")],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 30, height: 22)
+            Rectangle()
+                .fill(.black.opacity(0.28))
+                .frame(width: 1, height: 14)
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .strokeBorder(.black.opacity(0.15), lineWidth: 0.5)
+        )
     }
 
     private var subtitle: String {

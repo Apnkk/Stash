@@ -33,9 +33,11 @@ struct CardDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                header
-
+                // La carte fidélité garde un bandeau titre ; la carte bancaire
+                // affiche sa propre carte réaliste (RealisticCardView) et n'a
+                // donc pas besoin du header.
                 if card.kind == .loyalty {
+                    header
                     loyaltyContent
                 } else {
                     bankContent
@@ -199,23 +201,18 @@ struct CardDetailView: View {
 
     private var bankContent: some View {
         VStack(spacing: 18) {
-            VStack(spacing: 8) {
-                Text(displayedNumber)
-                    .font(.title2.weight(.semibold).monospaced())
-                    .textSelectionEnabled(revealedNumber != nil)
+            // Carte bancaire réaliste (dégradé de marque, puce, logo réseau,
+            // numéro formaté). Elle porte titulaire et expiration, et affiche
+            // le numéro complet uniquement après authentification.
+            RealisticCardView(card: currentCard, revealedNumber: revealedNumber)
+                .padding(.top, 4)
 
-                if !currentCard.holder.isEmpty || !currentCard.expiry.isEmpty {
-                    HStack(spacing: 20) {
-                        if !currentCard.holder.isEmpty {
-                            labelValue("Titulaire", currentCard.holder)
-                        }
-                        if !currentCard.expiry.isEmpty {
-                            labelValue("Expire", currentCard.expiry)
-                        }
-                    }
-                }
+            if revealedNumber != nil {
+                Text(displayedNumber)
+                    .font(.footnote.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
             }
-            .padding(.vertical, 12)
 
             if let error = authError {
                 Text(error)
@@ -269,16 +266,6 @@ struct CardDetailView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.top, 4)
-        }
-    }
-
-    private func labelValue(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label.uppercased())
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.subheadline.weight(.medium))
         }
     }
 
