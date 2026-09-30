@@ -25,6 +25,7 @@
 		A1000000000000000000010F /* MotionStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* MotionStyle.swift */; };
 		A10000000000000000000111 /* AddCardTypeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* AddCardTypeView.swift */; };
 		A10000000000000000000112 /* CardSavedSuccessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* CardSavedSuccessView.swift */; };
+		A10000000000000000000114 /* AddBankCardFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* AddBankCardFlowView.swift */; };
 		A10000000000000000000110 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000D /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -50,6 +51,7 @@
 		A10000000000000000000012 /* MotionStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionStyle.swift; sourceTree = "<group>"; };
 		A10000000000000000000013 /* AddCardTypeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddCardTypeView.swift; sourceTree = "<group>"; };
 		A10000000000000000000014 /* CardSavedSuccessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardSavedSuccessView.swift; sourceTree = "<group>"; };
+		A10000000000000000000016 /* AddBankCardFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBankCardFlowView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -135,6 +137,7 @@
 				A10000000000000000000008 /* CardListView.swift */,
 				A10000000000000000000013 /* AddCardTypeView.swift */,
 				A10000000000000000000009 /* CardFormView.swift */,
+				A10000000000000000000016 /* AddBankCardFlowView.swift */,
 				A10000000000000000000014 /* CardSavedSuccessView.swift */,
 				A1000000000000000000000A /* CardDetailView.swift */,
 				A10000000000000000000010 /* RealisticCardView.swift */,
@@ -227,6 +230,7 @@
 				A10000000000000000000108 /* CardListView.swift in Sources */,
 				A10000000000000000000111 /* AddCardTypeView.swift in Sources */,
 				A10000000000000000000109 /* CardFormView.swift in Sources */,
+				A10000000000000000000114 /* AddBankCardFlowView.swift in Sources */,
 				A10000000000000000000112 /* CardSavedSuccessView.swift in Sources */,
 				A1000000000000000000010A /* CardDetailView.swift in Sources */,
 				A1000000000000000000010D /* RealisticCardView.swift in Sources */,
