@@ -20,8 +20,9 @@ struct AddCardTypeView: View {
                 backdrop
 
                 VStack(spacing: 0) {
+                    Spacer(minLength: 12)
+
                     header
-                        .padding(.top, 8)
                         .padding(.horizontal, 24)
 
                     VStack(spacing: 16) {
@@ -35,9 +36,8 @@ struct AddCardTypeView: View {
                     .padding(.horizontal, 24)
                     .padding(.top, 28)
 
-                    Spacer(minLength: 0)
+                    Spacer(minLength: 12)
                 }
-                .padding(.top, 12)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -179,6 +179,7 @@ private struct CardTypeOption: View {
         switch kind {
         case .bank:    return "creditcard.fill"
         case .loyalty: return "barcode"
+        case .other:   return "rectangle.stack.fill"
         }
     }
 
@@ -186,6 +187,7 @@ private struct CardTypeOption: View {
         switch kind {
         case .bank:    return "Carte bancaire"
         case .loyalty: return "Carte de fidélité"
+        case .other:   return "Autres cartes"
         }
     }
 
@@ -193,6 +195,7 @@ private struct CardTypeOption: View {
         switch kind {
         case .bank:    return "Numéro chiffré dans le trousseau, consultation protégée par Face ID."
         case .loyalty: return "Code-barres ou QR code, à scanner en caisse."
+        case .other:   return "Transport, mutuelle, badge… avec un code-barres ou QR facultatif."
         }
     }
 
@@ -200,6 +203,7 @@ private struct CardTypeOption: View {
         switch kind {
         case .bank:    return Color(hex: "#2A4BD7")
         case .loyalty: return Color.stashRed
+        case .other:   return Color(hex: "#5A5A60")
         }
     }
 }

@@ -36,7 +36,7 @@ struct CardDetailView: View {
                 // La carte fidélité garde un bandeau titre ; la carte bancaire
                 // affiche sa propre carte réaliste (RealisticCardView) et n'a
                 // donc pas besoin du header.
-                if card.kind == .loyalty {
+                if card.kind != .bank {
                     header
                     loyaltyContent
                 } else {
@@ -66,13 +66,13 @@ struct CardDetailView: View {
             }
         }
         .onAppear {
-            if card.kind == .loyalty {
+            if card.kind != .bank {
                 previousBrightness = UIScreen.main.brightness
                 UIScreen.main.brightness = 1.0
             }
         }
         .onDisappear {
-            if card.kind == .loyalty {
+            if card.kind != .bank {
                 UIScreen.main.brightness = previousBrightness
             }
             autoHideTask?.cancel()

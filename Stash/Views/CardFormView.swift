@@ -59,6 +59,9 @@ struct CardFormView: View {
         switch kind {
         case .loyalty:
             return !code.trimmingCharacters(in: .whitespaces).isEmpty
+        case .other:
+            // Pour une « autre carte », le nom suffit ; le code est facultatif.
+            return true
         case .bank:
             // L'expiration, si renseignée, doit être valide dans les deux cas.
             guard expiry.isEmpty || CardValidator.isExpiryValid(expiry) else { return false }
@@ -88,10 +91,10 @@ struct CardFormView: View {
                         .textInputAutocapitalization(.words)
                 }
 
-                if kind == .loyalty {
-                    loyaltySection
-                } else {
+                if kind == .bank {
                     bankSection
+                } else {
+                    loyaltySection
                 }
 
                 Section("Couleur") {
@@ -150,13 +153,19 @@ struct CardFormView: View {
     }
 
     private var loyaltySection: some View {
-        Section("Code de fidélité") {
-            TextField("Numéro / code", text: $code)
+        Section {
+            TextField(kind == .other ? "Numéro / code (facultatif)" : "Numéro / code", text: $code)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
             Picker("Type de code", selection: $format) {
                 ForEach(BarcodeFormat.allCases) { Text($0.label).tag($0) }
             }
+        } header: {
+            Text(kind == .other ? "Code (facultatif)" : "Code de fidélité")
+        } footer: {
+            Text(kind == .other
+                 ? "Ajoute un code-barres ou QR si la carte en a un. Sinon, laisse vide."
+                 : "Le code sera affiché en grand et scannable en caisse.")
         }
     }
 

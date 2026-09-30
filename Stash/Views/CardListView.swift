@@ -175,7 +175,7 @@ struct CardTileView: View {
                     // Puce EMV miniature, pour évoquer la carte physique.
                     miniChip
                 } else {
-                    Image(systemName: "barcode")
+                    Image(systemName: card.kind == .other ? "rectangle.stack.fill" : "barcode")
                         .foregroundStyle(.white.opacity(0.9))
                 }
                 Spacer()
@@ -247,6 +247,8 @@ struct CardTileView: View {
         switch card.kind {
         case .loyalty:
             return card.code
+        case .other:
+            return card.code.isEmpty ? "Carte" : card.code
         case .bank:
             return "•••• •••• •••• \(card.lastFour.isEmpty ? "••••" : card.lastFour)"
         }

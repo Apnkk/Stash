@@ -3,8 +3,10 @@ import SwiftUI
 
 /// Type de carte géré par l'app.
 enum CardKind: String, Codable, CaseIterable, Identifiable {
-    case loyalty      // carte de fidélité (code-barres / QR)
+    // L'ordre de déclaration fixe l'ordre d'affichage des tuiles de choix.
     case bank         // carte bancaire (stockée chiffrée, consultation seule)
+    case loyalty      // carte de fidélité (code-barres / QR)
+    case other        // autre carte (transport, mutuelle, badge… code optionnel)
 
     var id: String { rawValue }
 
@@ -12,6 +14,7 @@ enum CardKind: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .loyalty: return "Fidélité"
         case .bank:    return "Bancaire"
+        case .other:   return "Autre"
         }
     }
 }
