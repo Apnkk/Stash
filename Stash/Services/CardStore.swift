@@ -12,6 +12,9 @@ final class CardStore: ObservableObject {
 
     @Published private(set) var cards: [Card] = []
 
+    /// Dernière erreur de persistance, à afficher dans l'UI (nil si tout va bien).
+    @Published var persistenceError: String?
+
     private let fileURL: URL
 
     init() {
@@ -32,12 +35,14 @@ final class CardStore: ObservableObject {
         }
     }
 
+    /// Écrit la liste sur disque. En cas d'échec, publie l'erreur pour l'UI.
     private func persist() {
         do {
             let data = try JSONEncoder().encode(cards)
             try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
+            persistenceError = nil
         } catch {
-            print("Échec de la sauvegarde des cartes : \(error)")
+            persistenceError = "Échec de l'enregistrement : \(error.localizedDescription)"
         }
     }
 
@@ -45,13 +50,16 @@ final class CardStore: ObservableObject {
 
     /// Ajoute ou met à jour une carte. Pour une carte bancaire, `fullNumber`
     /// (le numéro complet) est stocké dans le Keychain, pas dans le JSON.
-    func upsert(_ card: Card, fullNumber: String? = nil) {
+    /// - Throws: `SecureVault.VaultError` si l'écriture du secret échoue.
+    func upsert(_ card: Card, fullNumber: String? = nil) throws {
         var toSave = card
 
         if card.kind == .bank, let number = fullNumber, !number.isEmpty {
             let digits = number.filter(\.isNumber)
             toSave.lastFour = String(digits.suffix(4))
-            SecureVault.save(digits, for: card.id.uuidString)
+            // On écrit d'abord le secret : si le Keychain refuse, on ne veut
+            // pas laisser une carte sans son numéro. L'erreur remonte à l'UI.
+            try SecureVault.save(digits, for: card.id.uuidString)
         }
 
         if let idx = cards.firstIndex(where: { $0.id == card.id }) {
@@ -63,17 +71,22 @@ final class CardStore: ObservableObject {
     }
 
     /// Supprime une carte et son éventuel secret dans le Keychain.
+    /// La suppression du secret est non bloquante : la carte est retirée
+    /// de la liste même si le Keychain renvoie une erreur.
     func delete(_ card: Card) {
         cards.removeAll { $0.id == card.id }
         if card.kind == .bank {
-            SecureVault.delete(card.id.uuidString)
+            try? SecureVault.delete(card.id.uuidString)
         }
         persist()
     }
 
-    /// Lit le numéro complet d'une carte bancaire (après authentification).
-    func fullNumber(for card: Card) -> String? {
-        SecureVault.read(card.id.uuidString)
+    /// Lit le numéro complet d'une carte bancaire. La lecture déclenche le
+    /// prompt Face ID / Touch ID du Keychain lui-même.
+    /// - Parameter reason: message affiché dans la boîte de dialogue système.
+    /// - Throws: `SecureVault.VaultError` (annulation, refus, absence…).
+    func fullNumber(for card: Card, reason: String) throws -> String {
+        try SecureVault.read(card.id.uuidString, prompt: reason)
     }
 
     /// Réordonne les cartes (drag & drop dans la liste) et persiste le nouvel ordre.
@@ -87,7 +100,7 @@ final class CardStore: ObservableObject {
         for index in offsets {
             let card = cards[index]
             if card.kind == .bank {
-                SecureVault.delete(card.id.uuidString)
+                try? SecureVault.delete(card.id.uuidString)
             }
         }
         cards.remove(atOffsets: offsets)

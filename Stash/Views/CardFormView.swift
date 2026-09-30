@@ -25,10 +25,26 @@ struct CardFormView: View {
     @State private var note = ""
 
     @State private var showDeleteConfirm = false
+    @State private var saveError: String?
 
     /// Réseau bancaire déduit en direct du numéro saisi.
     private var detectedNetwork: CardNetwork {
         CardNetwork.detect(from: fullNumber)
+    }
+
+    /// Validation type Wallet du numéro saisi (Luhn + longueur + réseau).
+    private var numberValidation: CardValidator.Result {
+        CardValidator.validate(fullNumber)
+    }
+
+    /// Le numéro saisi est-il complet et cohérent ? (vide = neutre, pas d'erreur)
+    private var numberLooksValid: Bool {
+        fullNumber.filter(\.isNumber).isEmpty || numberValidation.isValid
+    }
+
+    /// L'expiration saisie est-elle valide ? (vide = neutre)
+    private var expiryLooksValid: Bool {
+        expiry.isEmpty || CardValidator.isExpiryValid(expiry)
     }
 
     private var isEditing: Bool { card != nil }
@@ -39,8 +55,15 @@ struct CardFormView: View {
         case .loyalty:
             return !code.trimmingCharacters(in: .whitespaces).isEmpty
         case .bank:
-            // À la création il faut un numéro ; en édition on peut le laisser inchangé.
-            return isEditing || fullNumber.filter(\.isNumber).count >= 12
+            // L'expiration, si renseignée, doit être valide dans les deux cas.
+            guard expiry.isEmpty || CardValidator.isExpiryValid(expiry) else { return false }
+            if isEditing {
+                // En édition on peut laisser le numéro inchangé (vide) ; s'il est
+                // saisi, il doit être valide.
+                return fullNumber.filter(\.isNumber).isEmpty || numberValidation.isValid
+            }
+            // À la création il faut un numéro complet et valide (Luhn + longueur).
+            return numberValidation.isValid
         }
     }
 
@@ -75,6 +98,14 @@ struct CardFormView: View {
                     Text("Note")
                 } footer: {
                     Text("Visible seulement dans l'app, stockée sur ton téléphone.")
+                }
+
+                if let saveError {
+                    Section {
+                        Text(saveError)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
                 }
 
                 if isEditing {
@@ -137,6 +168,11 @@ struct CardFormView: View {
                         .accessibilityLabel("Réseau détecté : \(detectedNetwork.label)")
                 }
             }
+            if !numberLooksValid {
+                Text("Numéro de carte invalide (vérifie les chiffres).")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
             TextField("Titulaire", text: $holder)
                 .textInputAutocapitalization(.words)
             TextField("Expiration (MM/AA)", text: $expiry)
@@ -144,6 +180,11 @@ struct CardFormView: View {
                 .onChange(of: expiry) { _, newValue in
                     expiry = formatExpiry(newValue)
                 }
+            if !expiryLooksValid {
+                Text("Date d'expiration invalide ou dépassée.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         } header: {
             Text("Carte bancaire")
         } footer: {
@@ -206,7 +247,12 @@ struct CardFormView: View {
         updated.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let number = fullNumber.isEmpty ? nil : fullNumber
-        store.upsert(updated, fullNumber: number)
-        dismiss()
+        do {
+            try store.upsert(updated, fullNumber: number)
+            dismiss()
+        } catch {
+            saveError = (error as? LocalizedError)?.errorDescription
+                ?? "Impossible d'enregistrer la carte."
+        }
     }
 }

@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Combine
 
 /// Vue plein écran d'une carte.
 /// - Fidélité : affiche le code-barres / QR en grand pour le scan en caisse.
@@ -18,6 +19,13 @@ struct CardDetailView: View {
     @State private var codeCopied = false
     @State private var shareImage: UIImage?
     @State private var showingShare = false
+    @State private var isCaptured = UIScreen.main.isCaptured
+
+    /// Tâche d'auto-masquage : re-masque le numéro après un délai d'inactivité.
+    @State private var autoHideTask: Task<Void, Never>?
+
+    /// Délai avant re-masquage automatique du numéro révélé (secondes).
+    private let autoHideDelay: UInt64 = 30
 
     // Sauvegarde/restaure la luminosité pour un scan plus fiable (fidélité).
     @State private var previousBrightness = UIScreen.main.brightness
@@ -65,6 +73,7 @@ struct CardDetailView: View {
             if card.kind == .loyalty {
                 UIScreen.main.brightness = previousBrightness
             }
+            autoHideTask?.cancel()
         }
         .onChange(of: scenePhase) { _, newPhase in
             // Confidentialité : dès que l'app quitte le premier plan (feuille
@@ -74,6 +83,21 @@ struct CardDetailView: View {
             if newPhase != .active, revealedNumber != nil {
                 hide()
             }
+        }
+        // Anti-capture : re-masque immédiatement le numéro si l'utilisateur
+        // fait une capture d'écran.
+        .onReceive(NotificationCenter.default.publisher(
+            for: UIApplication.userDidTakeScreenshotNotification
+        )) { _ in
+            if revealedNumber != nil { hide() }
+        }
+        // Enregistrement d'écran / recopie AirPlay : masque tant que l'écran
+        // est capturé, et empêche de révéler pendant ce temps.
+        .onReceive(NotificationCenter.default.publisher(
+            for: UIScreen.capturedDidChangeNotification
+        )) { _ in
+            isCaptured = UIScreen.main.isCaptured
+            if isCaptured, revealedNumber != nil { hide() }
         }
     }
 
@@ -200,6 +224,13 @@ struct CardDetailView: View {
                     .multilineTextAlignment(.center)
             }
 
+            if isCaptured {
+                Text("Écran en cours d'enregistrement ou de recopie : l'affichage du numéro est bloqué.")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+            }
+
             if revealedNumber == nil {
                 Button {
                     reveal()
@@ -210,6 +241,7 @@ struct CardDetailView: View {
                         .padding(.vertical, 8)
                 }
                 .glassProminentButtonIfAvailable()
+                .disabled(isCaptured)
             } else {
                 HStack(spacing: 12) {
                     Button {
@@ -271,23 +303,51 @@ struct CardDetailView: View {
 
     private func reveal() {
         authError = nil
-        BiometricAuth.authenticate(reason: "Affiche le numéro de \(currentCard.name).") { result in
-            switch result {
-            case .success:
-                if let number = store.fullNumber(for: currentCard) {
+        // Enregistrement d'écran actif : on refuse de révéler.
+        guard !isCaptured else {
+            authError = "Impossible d'afficher pendant un enregistrement d'écran."
+            return
+        }
+        // La lecture du Keychain déclenche elle-même Face ID / Touch ID
+        // (SecAccessControl .biometryCurrentSet) : pas de double prompt.
+        // On sort du thread principal car SecItemCopyMatching est bloquant.
+        // On extrait les valeurs (String, Sendable) sur le MainActor AVANT
+        // d'entrer dans le contexte détaché, pour ne pas y capturer `self`
+        // ni `store` (isolés @MainActor → erreur de concurrence Swift 6).
+        let key = currentCard.id.uuidString
+        let reason = "Affiche le numéro de \(currentCard.name)."
+        Task {
+            do {
+                let number = try await Task.detached(priority: .userInitiated) {
+                    try SecureVault.read(key, prompt: reason)
+                }.value
+                await MainActor.run {
                     revealedNumber = number
-                } else {
-                    authError = "Numéro introuvable dans le trousseau."
+                    scheduleAutoHide()
                 }
-            case .failed(let message):
-                authError = message
+            } catch {
+                let message = (error as? LocalizedError)?.errorDescription
+                    ?? "Authentification refusée."
+                await MainActor.run { authError = message }
             }
+        }
+    }
+
+    /// Arme (ou ré-arme) le re-masquage automatique après inactivité.
+    private func scheduleAutoHide() {
+        autoHideTask?.cancel()
+        autoHideTask = Task {
+            try? await Task.sleep(nanoseconds: autoHideDelay * 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run { hide() }
         }
     }
 
     private func hide() {
         revealedNumber = nil
         copied = false
+        autoHideTask?.cancel()
+        autoHideTask = nil
     }
 
     private func copyNumber() {

@@ -66,6 +66,79 @@ enum CardNetwork: String, Codable {
         if two == 65 || four == 6011 { return .discover }
         return .unknown
     }
+
+    /// Longueurs de numéro valides pour le réseau (nombre de chiffres).
+    var validLengths: Set<Int> {
+        switch self {
+        case .visa:       return [13, 16, 19]
+        case .mastercard: return [16]
+        case .amex:       return [15]
+        case .discover:   return [16, 19]
+        case .unknown:    return Set(12...19)
+        }
+    }
+}
+
+/// Validation d'un numéro de carte bancaire type Apple Wallet.
+enum CardValidator {
+
+    /// Résultat détaillé de la validation d'un numéro.
+    struct Result {
+        var isLuhnValid: Bool
+        var hasValidLength: Bool
+        var network: CardNetwork
+
+        /// Le numéro est complet et cohérent (réseau + longueur + Luhn).
+        var isValid: Bool { isLuhnValid && hasValidLength }
+    }
+
+    /// Algorithme de Luhn : valide la clé de contrôle d'un numéro de carte.
+    static func passesLuhn(_ number: String) -> Bool {
+        let digits = number.compactMap { $0.wholeNumberValue }
+        guard digits.count >= 2 else { return false }
+        var sum = 0
+        // On double un chiffre sur deux en partant de la droite.
+        for (offset, digit) in digits.reversed().enumerated() {
+            if offset % 2 == 1 {
+                let doubled = digit * 2
+                sum += doubled > 9 ? doubled - 9 : doubled
+            } else {
+                sum += digit
+            }
+        }
+        return sum % 10 == 0
+    }
+
+    /// Valide un numéro complet (réseau, longueur, Luhn).
+    static func validate(_ number: String) -> Result {
+        let digits = number.filter(\.isNumber)
+        let network = CardNetwork.detect(from: digits)
+        let hasLength = network.validLengths.contains(digits.count)
+        let luhn = passesLuhn(digits)
+        return Result(isLuhnValid: luhn, hasValidLength: hasLength, network: network)
+    }
+
+    /// Valide une date d'expiration au format MM/AA, non expirée.
+    static func isExpiryValid(_ expiry: String) -> Bool {
+        let parts = expiry.split(separator: "/")
+        guard parts.count == 2,
+              let month = Int(parts[0]),
+              let yearShort = Int(parts[1]),
+              (1...12).contains(month) else {
+            return false
+        }
+        // AA -> 20AA. On compare au mois courant.
+        let fullYear = 2000 + yearShort
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date()
+        let nowComponents = calendar.dateComponents([.year, .month], from: now)
+        guard let nowYear = nowComponents.year, let nowMonth = nowComponents.month else {
+            return false
+        }
+        if fullYear > nowYear { return true }
+        if fullYear < nowYear { return false }
+        return month >= nowMonth
+    }
 }
 
 /// Modèle unique pour les deux types de cartes.
