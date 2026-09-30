@@ -20,6 +20,8 @@
 		A1000000000000000000010B /* GlassStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000E /* GlassStyle.swift */; };
 		A1000000000000000000010C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000F /* SettingsView.swift */; };
 		A1000000000000000000010D /* RealisticCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* RealisticCardView.swift */; };
+		A1000000000000000000010E /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* OnboardingView.swift */; };
+		A1000000000000000000010F /* MotionStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* MotionStyle.swift */; };
 		A10000000000000000000110 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000D /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -40,6 +42,8 @@
 		A1000000000000000000000E /* GlassStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassStyle.swift; sourceTree = "<group>"; };
 		A1000000000000000000000F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A10000000000000000000010 /* RealisticCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealisticCardView.swift; sourceTree = "<group>"; };
+		A10000000000000000000011 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		A10000000000000000000012 /* MotionStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionStyle.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -125,6 +129,8 @@
 				A10000000000000000000009 /* CardFormView.swift */,
 				A1000000000000000000000A /* CardDetailView.swift */,
 				A10000000000000000000010 /* RealisticCardView.swift */,
+				A10000000000000000000011 /* OnboardingView.swift */,
+				A10000000000000000000012 /* MotionStyle.swift */,
 				A1000000000000000000000E /* GlassStyle.swift */,
 				A1000000000000000000000F /* SettingsView.swift */,
 			);
@@ -212,6 +218,8 @@
 				A10000000000000000000109 /* CardFormView.swift in Sources */,
 				A1000000000000000000010A /* CardDetailView.swift in Sources */,
 				A1000000000000000000010D /* RealisticCardView.swift in Sources */,
+				A1000000000000000000010E /* OnboardingView.swift in Sources */,
+				A1000000000000000000010F /* MotionStyle.swift in Sources */,
 				A1000000000000000000010B /* GlassStyle.swift in Sources */,
 				A1000000000000000000010C /* SettingsView.swift in Sources */,
 			);
