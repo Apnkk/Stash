@@ -28,5 +28,7 @@ Carthage/Build/
 .idea/
 .vscode/
 
-# Icône générée au build (recréée par Tools/generate_icon.swift)
+# Tailles d'icône générées au build par Tools/generate_icon.swift (ignorées),
+# SAUF l'image source AppIcon-1024.png qui doit être versionnée pour le CI.
 Stash/Assets.xcassets/AppIcon.appiconset/*.png
+!Stash/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png
