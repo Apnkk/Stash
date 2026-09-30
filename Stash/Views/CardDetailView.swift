@@ -7,6 +7,7 @@ import UIKit
 struct CardDetailView: View {
     @EnvironmentObject private var store: CardStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
 
     let card: Card
 
@@ -63,6 +64,15 @@ struct CardDetailView: View {
         .onDisappear {
             if card.kind == .loyalty {
                 UIScreen.main.brightness = previousBrightness
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            // Confidentialité : dès que l'app quitte le premier plan (feuille
+            // de partage, sélecteur multitâche, verrouillage…), on re-masque
+            // le numéro bancaire pour qu'il n'apparaisse pas dans l'aperçu
+            // multitâche ni sur une capture d'écran système.
+            if newPhase != .active, revealedNumber != nil {
+                hide()
             }
         }
     }
