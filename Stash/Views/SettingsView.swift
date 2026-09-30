@@ -16,9 +16,23 @@ struct SettingsView: View {
     @State private var message: String?
     @State private var messageIsError = false
 
+    @AppStorage(AutoLockDelay.storageKey) private var autoLockRaw = AutoLockDelay.thirtySeconds.rawValue
+
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Picker("Verrouillage auto", selection: $autoLockRaw) {
+                        ForEach(AutoLockDelay.allCases) { delay in
+                            Text(delay.label).tag(delay.rawValue)
+                        }
+                    }
+                } header: {
+                    Text("Sécurité")
+                } footer: {
+                    Text("Délai avant que Stash ne redemande Face ID / Touch ID après être passé en arrière-plan. « Immédiat » reverrouille dès que tu quittes l'app.")
+                }
+
                 Section {
                     Button {
                         prepareExport()
