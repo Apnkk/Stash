@@ -35,6 +35,39 @@ enum BarcodeFormat: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Réseau d'une carte bancaire, déduit du préfixe du numéro (règles IIN simplifiées).
+enum CardNetwork: String, Codable {
+    case visa
+    case mastercard
+    case amex
+    case discover
+    case unknown
+
+    var label: String {
+        switch self {
+        case .visa:       return "Visa"
+        case .mastercard: return "Mastercard"
+        case .amex:       return "American Express"
+        case .discover:   return "Discover"
+        case .unknown:    return "Carte"
+        }
+    }
+
+    /// Détecte le réseau à partir du numéro (chiffres uniquement).
+    static func detect(from number: String) -> CardNetwork {
+        let digits = number.filter(\.isNumber)
+        guard let first = digits.first else { return .unknown }
+        let two = digits.count >= 2 ? Int(digits.prefix(2)) ?? 0 : 0
+        let four = digits.count >= 4 ? Int(digits.prefix(4)) ?? 0 : 0
+
+        if first == "4" { return .visa }
+        if two == 34 || two == 37 { return .amex }
+        if (51...55).contains(two) || (2221...2720).contains(four) { return .mastercard }
+        if two == 65 || four == 6011 { return .discover }
+        return .unknown
+    }
+}
+
 /// Modèle unique pour les deux types de cartes.
 /// Les champs sensibles (numéro de CB) ne sont JAMAIS stockés en clair :
 /// ils vivent dans le Keychain via `SecureVault`, indexés par `id`.
@@ -53,6 +86,10 @@ struct Card: Identifiable, Codable, Equatable {
     var expiry: String               // MM/AA
     var lastFour: String             // 4 derniers chiffres, affichés masqués
 
+    // --- Communs ---
+    var note: String                 // note libre de l'utilisateur
+    var createdAt: Date              // date d'ajout
+
     init(
         id: UUID = UUID(),
         kind: CardKind,
@@ -62,7 +99,9 @@ struct Card: Identifiable, Codable, Equatable {
         format: BarcodeFormat = .auto,
         holder: String = "",
         expiry: String = "",
-        lastFour: String = ""
+        lastFour: String = "",
+        note: String = "",
+        createdAt: Date = Date()
     ) {
         self.id = id
         self.kind = kind
@@ -73,7 +112,34 @@ struct Card: Identifiable, Codable, Equatable {
         self.holder = holder
         self.expiry = expiry
         self.lastFour = lastFour
+        self.note = note
+        self.createdAt = createdAt
     }
+
+    // Décodage tolérant : les cartes déjà enregistrées (avant l'ajout de
+    // `note`/`createdAt`) ne possèdent pas ces clés → valeurs par défaut.
+    enum CodingKeys: String, CodingKey {
+        case id, kind, name, colorHex, code, format, holder, expiry, lastFour, note, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id       = try c.decode(UUID.self, forKey: .id)
+        kind     = try c.decode(CardKind.self, forKey: .kind)
+        name     = try c.decode(String.self, forKey: .name)
+        colorHex = try c.decode(String.self, forKey: .colorHex)
+        code     = try c.decodeIfPresent(String.self, forKey: .code) ?? ""
+        format   = try c.decodeIfPresent(BarcodeFormat.self, forKey: .format) ?? .auto
+        holder   = try c.decodeIfPresent(String.self, forKey: .holder) ?? ""
+        expiry   = try c.decodeIfPresent(String.self, forKey: .expiry) ?? ""
+        lastFour = try c.decodeIfPresent(String.self, forKey: .lastFour) ?? ""
+        note     = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+    }
+
+    /// Réseau bancaire déduit des 4 derniers chiffres n'est pas fiable ;
+    /// on ne l'estime qu'à partir d'un numéro complet, au moment de la saisie.
+    var networkFromLastFour: CardNetwork { .unknown }
 }
 
 /// Palette de couleurs proposée à l'ajout d'une carte.

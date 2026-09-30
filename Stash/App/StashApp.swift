@@ -4,6 +4,7 @@ import SwiftUI
 struct StashApp: App {
     @StateObject private var store = CardStore()
     @StateObject private var lock = AppLock()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -21,6 +22,18 @@ struct StashApp: App {
             .animation(.easeInOut(duration: 0.25), value: lock.isUnlocked)
             .preferredColorScheme(.dark)
             .onAppear { lock.unlockIfNeeded() }
+            .onChange(of: scenePhase) { _, newPhase in
+                switch newPhase {
+                case .background:
+                    // Reverrouille dès que l'app quitte l'écran : au retour,
+                    // Face ID / Touch ID sera de nouveau exigé.
+                    lock.lock()
+                case .active:
+                    lock.unlockIfNeeded()
+                default:
+                    break
+                }
+            }
         }
     }
 }
@@ -31,9 +44,14 @@ final class AppLock: ObservableObject {
     @Published var isUnlocked = false
     @Published var lastError: String?
 
+    /// Empêche de relancer une authentification déjà en cours.
+    private var isAuthenticating = false
+
     func unlockIfNeeded() {
-        guard !isUnlocked else { return }
+        guard !isUnlocked, !isAuthenticating else { return }
+        isAuthenticating = true
         BiometricAuth.authenticate(reason: "Déverrouille Stash pour accéder à tes cartes.") { [weak self] result in
+            self?.isAuthenticating = false
             switch result {
             case .success:
                 self?.isUnlocked = true
@@ -42,5 +60,11 @@ final class AppLock: ObservableObject {
                 self?.lastError = message
             }
         }
+    }
+
+    /// Reverrouille l'app (au passage en arrière-plan).
+    func lock() {
+        isUnlocked = false
+        lastError = nil
     }
 }

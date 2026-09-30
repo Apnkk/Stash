@@ -14,6 +14,9 @@ struct CardDetailView: View {
     @State private var revealedNumber: String?
     @State private var authError: String?
     @State private var copied = false
+    @State private var codeCopied = false
+    @State private var shareImage: UIImage?
+    @State private var showingShare = false
 
     // Sauvegarde/restaure la luminosité pour un scan plus fiable (fidélité).
     @State private var previousBrightness = UIScreen.main.brightness
@@ -28,6 +31,10 @@ struct CardDetailView: View {
                 } else {
                     bankContent
                 }
+
+                if !currentCard.note.isEmpty {
+                    noteSection
+                }
             }
             .padding(20)
         }
@@ -41,6 +48,11 @@ struct CardDetailView: View {
         .sheet(isPresented: $showingEdit) {
             CardFormView(card: currentCard)
                 .environmentObject(store)
+        }
+        .sheet(isPresented: $showingShare) {
+            if let image = shareImage {
+                ShareSheet(items: [image])
+            }
         }
         .onAppear {
             if card.kind == .loyalty {
@@ -108,10 +120,45 @@ struct CardDetailView: View {
                 .font(.title3.weight(.semibold).monospaced())
                 .textSelection(.enabled)
 
+            HStack(spacing: 12) {
+                Button {
+                    copyCode()
+                } label: {
+                    Label(codeCopied ? "Copié !" : "Copier", systemImage: codeCopied ? "checkmark" : "doc.on.doc")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
+                .glassButtonIfAvailable()
+
+                Button {
+                    shareCode()
+                } label: {
+                    Label("Partager", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
+                .glassButtonIfAvailable()
+                .disabled(BarcodeGenerator.image(for: currentCard) == nil)
+            }
+
             Text("Présente ce code au lecteur en caisse.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var noteSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("NOTE")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(currentCard.note)
+                .font(.subheadline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+        }
+        .padding(16)
+        .glassPanel(cornerRadius: 14)
     }
 
     // MARK: - Bancaire
@@ -241,6 +288,31 @@ struct CardDetailView: View {
             copied = false
         }
     }
+
+    private func copyCode() {
+        UIPasteboard.general.string = currentCard.code
+        codeCopied = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+            codeCopied = false
+        }
+    }
+
+    private func shareCode() {
+        guard let image = BarcodeGenerator.image(for: currentCard) else { return }
+        shareImage = image
+        showingShare = true
+    }
+}
+
+/// Enveloppe UIKit de la feuille de partage système.
+private struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 private extension View {

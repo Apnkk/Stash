@@ -21,7 +21,15 @@ struct CardFormView: View {
     @State private var holder = ""
     @State private var expiry = ""
 
+    // Commun
+    @State private var note = ""
+
     @State private var showDeleteConfirm = false
+
+    /// Réseau bancaire déduit en direct du numéro saisi.
+    private var detectedNetwork: CardNetwork {
+        CardNetwork.detect(from: fullNumber)
+    }
 
     private var isEditing: Bool { card != nil }
 
@@ -58,6 +66,15 @@ struct CardFormView: View {
 
                 Section("Couleur") {
                     colorPicker
+                }
+
+                Section {
+                    TextField("Note (facultatif)", text: $note, axis: .vertical)
+                        .lineLimit(1...4)
+                } header: {
+                    Text("Note")
+                } footer: {
+                    Text("Visible seulement dans l'app, stockée sur ton téléphone.")
                 }
 
                 if isEditing {
@@ -107,12 +124,26 @@ struct CardFormView: View {
 
     private var bankSection: some View {
         Section {
-            TextField(isEditing ? "Laisser vide pour ne pas changer" : "Numéro de carte", text: $fullNumber)
-                .keyboardType(.numberPad)
+            HStack {
+                TextField(isEditing ? "Laisser vide pour ne pas changer" : "Numéro de carte", text: $fullNumber)
+                    .keyboardType(.numberPad)
+                if !fullNumber.isEmpty && detectedNetwork != .unknown {
+                    Text(detectedNetwork.label)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(.secondary.opacity(0.15), in: Capsule())
+                        .accessibilityLabel("Réseau détecté : \(detectedNetwork.label)")
+                }
+            }
             TextField("Titulaire", text: $holder)
                 .textInputAutocapitalization(.words)
             TextField("Expiration (MM/AA)", text: $expiry)
                 .keyboardType(.numbersAndPunctuation)
+                .onChange(of: expiry) { _, newValue in
+                    expiry = formatExpiry(newValue)
+                }
         } header: {
             Text("Carte bancaire")
         } footer: {
@@ -148,7 +179,18 @@ struct CardFormView: View {
         format = card.format
         holder = card.holder
         expiry = card.expiry
+        note = card.note
         // On ne pré-remplit jamais le numéro complet : il reste dans le Keychain.
+    }
+
+    /// Formate la saisie d'expiration en MM/AA au fil de la frappe.
+    private func formatExpiry(_ input: String) -> String {
+        let digits = String(input.filter(\.isNumber).prefix(4))
+        guard !digits.isEmpty else { return "" }
+        if digits.count <= 2 { return digits }
+        let month = digits.prefix(2)
+        let year = digits.dropFirst(2)
+        return "\(month)/\(year)"
     }
 
     private func save() {
@@ -161,6 +203,7 @@ struct CardFormView: View {
         updated.format = format
         updated.holder = holder.trimmingCharacters(in: .whitespaces)
         updated.expiry = expiry.trimmingCharacters(in: .whitespaces)
+        updated.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let number = fullNumber.isEmpty ? nil : fullNumber
         store.upsert(updated, fullNumber: number)

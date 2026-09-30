@@ -7,6 +7,7 @@ struct CardListView: View {
     @State private var showingForm = false
     @State private var editingCard: Card?
     @State private var searchText = ""
+    @State private var showingSettings = false
 
     private var filteredCards: [Card] {
         guard !searchText.isEmpty else { return store.cards }
@@ -27,6 +28,14 @@ struct CardListView: View {
             }
             .navigationTitle("Stash")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .glassButtonIfAvailable()
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         editingCard = nil
@@ -42,24 +51,47 @@ struct CardListView: View {
                 CardFormView(card: editingCard)
                     .environmentObject(store)
             }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
+                    .environmentObject(store)
+            }
         }
     }
 
     private var cardGrid: some View {
-        ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 14)], spacing: 14) {
-                ForEach(filteredCards) { card in
+        List {
+            ForEach(filteredCards) { card in
+                ZStack {
                     NavigationLink {
                         CardDetailView(card: card)
                             .environmentObject(store)
                     } label: {
-                        CardTileView(card: card)
+                        EmptyView()
                     }
-                    .buttonStyle(.plain)
+                    .opacity(0)
+
+                    CardTileView(card: card)
                 }
+                .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
-            .padding(16)
+            .onMove(perform: searchText.isEmpty ? move : nil)
+            .onDelete(perform: searchText.isEmpty ? deleteCards : nil)
         }
+        .listStyle(.plain)
+    }
+
+    /// Réordonne dans le store (uniquement hors recherche).
+    private func move(from source: IndexSet, to destination: Int) {
+        store.move(from: source, to: destination)
+    }
+
+    /// Supprime les cartes correspondant aux positions de la liste filtrée.
+    private func deleteCards(at offsets: IndexSet) {
+        let ids = offsets.map { filteredCards[$0].id }
+        let storeOffsets = IndexSet(store.cards.enumerated().compactMap { ids.contains($0.element.id) ? $0.offset : nil })
+        store.delete(at: storeOffsets)
     }
 
     private var emptyState: some View {

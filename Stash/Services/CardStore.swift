@@ -75,4 +75,54 @@ final class CardStore: ObservableObject {
     func fullNumber(for card: Card) -> String? {
         SecureVault.read(card.id.uuidString)
     }
+
+    /// Réordonne les cartes (drag & drop dans la liste) et persiste le nouvel ordre.
+    func move(from source: IndexSet, to destination: Int) {
+        cards.move(fromOffsets: source, toOffset: destination)
+        persist()
+    }
+
+    /// Supprime des cartes par leurs positions (swipe dans la liste).
+    func delete(at offsets: IndexSet) {
+        for index in offsets {
+            let card = cards[index]
+            if card.kind == .bank {
+                SecureVault.delete(card.id.uuidString)
+            }
+        }
+        cards.remove(atOffsets: offsets)
+        persist()
+    }
+
+    // MARK: - Export / import (sauvegarde des métadonnées, JAMAIS les secrets)
+
+    /// Exporte les cartes en JSON. Les numéros de CB (Keychain) ne sont
+    /// PAS inclus : seules les métadonnées visibles sont sauvegardées.
+    func exportData() -> Data? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return try? encoder.encode(cards)
+    }
+
+    /// Importe des cartes depuis un JSON exporté. Fusionne par `id`
+    /// (remplace une carte existante, ajoute les nouvelles). Renvoie le
+    /// nombre de cartes importées, ou `nil` si le format est invalide.
+    @discardableResult
+    func importData(_ data: Data) -> Int? {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let imported = try? decoder.decode([Card].self, from: data) else {
+            return nil
+        }
+        for card in imported {
+            if let idx = cards.firstIndex(where: { $0.id == card.id }) {
+                cards[idx] = card
+            } else {
+                cards.append(card)
+            }
+        }
+        persist()
+        return imported.count
+    }
 }
