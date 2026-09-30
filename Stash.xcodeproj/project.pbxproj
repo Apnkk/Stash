@@ -10,6 +10,7 @@
 		A10000000000000000000101 /* StashApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* StashApp.swift */; };
 		A10000000000000000000102 /* Card.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* Card.swift */; };
 		A10000000000000000000103 /* SecureVault.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* SecureVault.swift */; };
+		A10000000000000000000117 /* ArtVault.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* ArtVault.swift */; };
 		A10000000000000000000104 /* BiometricAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* BiometricAuth.swift */; };
 		A10000000000000000000105 /* BarcodeGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000005 /* BarcodeGenerator.swift */; };
 		A10000000000000000000113 /* BINDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* BINDatabase.swift */; };
@@ -33,6 +34,7 @@
 		A10000000000000000000001 /* StashApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000002 /* Card.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Card.swift; sourceTree = "<group>"; };
 		A10000000000000000000003 /* SecureVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureVault.swift; sourceTree = "<group>"; };
+		A10000000000000000000017 /* ArtVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtVault.swift; sourceTree = "<group>"; };
 		A10000000000000000000004 /* BiometricAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricAuth.swift; sourceTree = "<group>"; };
 		A10000000000000000000005 /* BarcodeGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarcodeGenerator.swift; sourceTree = "<group>"; };
 		A10000000000000000000015 /* BINDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BINDatabase.swift; sourceTree = "<group>"; };
@@ -115,6 +117,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000003 /* SecureVault.swift */,
+				A10000000000000000000017 /* ArtVault.swift */,
 				A10000000000000000000004 /* BiometricAuth.swift */,
 			);
 			path = Security;
@@ -222,6 +225,7 @@
 				A10000000000000000000101 /* StashApp.swift in Sources */,
 				A10000000000000000000102 /* Card.swift in Sources */,
 				A10000000000000000000103 /* SecureVault.swift in Sources */,
+				A10000000000000000000117 /* ArtVault.swift in Sources */,
 				A10000000000000000000104 /* BiometricAuth.swift in Sources */,
 				A10000000000000000000105 /* BarcodeGenerator.swift in Sources */,
 				A10000000000000000000113 /* BINDatabase.swift in Sources */,
