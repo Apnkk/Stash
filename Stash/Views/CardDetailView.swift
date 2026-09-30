@@ -20,7 +20,7 @@ struct CardDetailView: View {
     @State private var codeCopied = false
     @State private var shareImage: UIImage?
     @State private var showingShare = false
-    @State private var isCaptured = UIScreen.main.isCaptured
+    @State private var isCaptured = CardDetailView.activeScreen.isCaptured
 
     /// Image du code-barres / QR, générée une seule fois par carte (CoreImage
     /// + rendu CGImage sont coûteux : on évite de la recalculer à chaque rendu
@@ -34,7 +34,21 @@ struct CardDetailView: View {
     private let autoHideDelay: UInt64 = 30
 
     // Sauvegarde/restaure la luminosité pour un scan plus fiable (fidélité).
-    @State private var previousBrightness = UIScreen.main.brightness
+    @State private var previousBrightness = CardDetailView.activeScreen.brightness
+
+    /// Écran de la scène active. `UIScreen.main` est déprécié (il ignore le
+    /// multi-écran) : on prend l'écran de la première `UIWindowScene` au
+    /// premier plan, avec repli sur `UIScreen.screens.first` puis `.main`.
+    private static var activeScreen: UIScreen {
+        let scenes = UIApplication.shared.connectedScenes
+        if let windowScene = scenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive })
+            ?? scenes.compactMap({ $0 as? UIWindowScene }).first {
+            return windowScene.screen
+        }
+        return UIScreen.screens.first ?? UIScreen.main
+    }
 
     var body: some View {
         ScrollView {
@@ -73,8 +87,9 @@ struct CardDetailView: View {
         }
         .onAppear {
             if card.kind != .bank {
-                previousBrightness = UIScreen.main.brightness
-                UIScreen.main.brightness = 1.0
+                let screen = Self.activeScreen
+                previousBrightness = screen.brightness
+                screen.brightness = 1.0
                 regenerateBarcodeIfNeeded()
             }
         }
@@ -87,7 +102,7 @@ struct CardDetailView: View {
         }
         .onDisappear {
             if card.kind != .bank {
-                UIScreen.main.brightness = previousBrightness
+                Self.activeScreen.brightness = previousBrightness
             }
             autoHideTask?.cancel()
         }
@@ -112,7 +127,7 @@ struct CardDetailView: View {
         .onReceive(NotificationCenter.default.publisher(
             for: UIScreen.capturedDidChangeNotification
         )) { _ in
-            isCaptured = UIScreen.main.isCaptured
+            isCaptured = Self.activeScreen.isCaptured
             if isCaptured, revealedNumber != nil { hide() }
         }
     }

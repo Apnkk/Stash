@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import LocalAuthentication
 
 /// Coffre chiffré adossé au Keychain iOS.
 ///
@@ -59,7 +60,7 @@ enum SecureVault {
         }
 
         // Supprime l'éventuelle valeur existante avant de réécrire.
-        try? delete(key)
+        _ = try? delete(key)
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -79,13 +80,20 @@ enum SecureVault {
     /// Lit un secret. Déclenche le prompt biométrique du Keychain.
     /// - Parameter prompt: message affiché dans la boîte de dialogue système.
     static func read(_ key: String, prompt: String) throws -> String {
+        // `kSecUseOperationPrompt` est déprécié : on passe le message via un
+        // `LAContext.localizedReason`, transmis au Keychain par
+        // `kSecUseAuthenticationContext`. Le prompt biométrique reste piloté
+        // par le `SecAccessControl` (.biometryCurrentSet) posé à l'écriture.
+        let context = LAContext()
+        context.localizedReason = prompt
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecUseOperationPrompt as String: prompt
+            kSecUseAuthenticationContext as String: context
         ]
 
         var result: AnyObject?

@@ -86,7 +86,7 @@ final class CardStore: ObservableObject {
     func delete(_ card: Card) {
         cards.removeAll { $0.id == card.id }
         if card.kind == .bank {
-            try? SecureVault.delete(card.id.uuidString)
+            _ = try? SecureVault.delete(card.id.uuidString)
         }
         persist()
     }
@@ -110,7 +110,7 @@ final class CardStore: ObservableObject {
         for index in offsets {
             let card = cards[index]
             if card.kind == .bank {
-                try? SecureVault.delete(card.id.uuidString)
+                _ = try? SecureVault.delete(card.id.uuidString)
             }
         }
         cards.remove(atOffsets: offsets)
@@ -163,7 +163,7 @@ final class CardStore: ObservableObject {
     func purgeOrphanSecrets() {
         let liveIDs = Set(cards.map { $0.id.uuidString })
         for key in SecureVault.allKeys() where !liveIDs.contains(key) {
-            try? SecureVault.delete(key)
+            _ = try? SecureVault.delete(key)
         }
     }
 
