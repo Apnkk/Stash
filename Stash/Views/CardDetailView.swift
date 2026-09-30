@@ -121,7 +121,7 @@ struct CardDetailView: View {
             VStack(spacing: 8) {
                 Text(displayedNumber)
                     .font(.title2.weight(.semibold).monospaced())
-                    .textSelection(revealedNumber == nil ? .disabled : .enabled)
+                    .textSelectionEnabled(revealedNumber != nil)
 
                 if !currentCard.holder.isEmpty || !currentCard.expiry.isEmpty {
                     HStack(spacing: 20) {
@@ -239,6 +239,20 @@ struct CardDetailView: View {
         copied = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
             copied = false
+        }
+    }
+}
+
+private extension View {
+    /// Active la sélection de texte de façon conditionnelle.
+    /// `.disabled` et `.enabled` étant de types différents, on ne peut pas les
+    /// mélanger dans un ternaire : on applique donc le modificateur conditionnellement.
+    @ViewBuilder
+    func textSelectionEnabled(_ enabled: Bool) -> some View {
+        if enabled {
+            self.textSelection(.enabled)
+        } else {
+            self.textSelection(.disabled)
         }
     }
 }
