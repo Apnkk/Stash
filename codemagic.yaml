@@ -1,27 +1,21 @@
-name: Build unsigned IPA
-
-on:
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: macos-15
-    env:
-      SCHEME: Stash
-      DERIVED_DATA: ${{ github.workspace }}/build/DerivedData
-      OUTPUT_DIR: ${{ github.workspace }}/build/ipa
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Select Xcode
-        run: |
+workflows:
+  build-unsigned-ipa:
+    name: Build unsigned IPA
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      xcode: latest
+      vars:
+        SCHEME: "Stash"
+        BUNDLE_ID: "com.ares.stash"
+    scripts:
+      - name: Select Xcode 26 (SDK iOS 26 / Liquid Glass)
+        script: |
           set -euo pipefail
-          # Sélectionne le Xcode le plus récent disponible (Xcode 26 pour le SDK iOS 26 / Liquid Glass).
-          XCODE_APP=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          # Sélectionne le Xcode le plus récent disponible ; vise Xcode 26 si présent.
+          XCODE_APP=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)
           if [ -z "$XCODE_APP" ]; then
-            echo "Xcode 26 introuvable sur ce runner. Xcode disponibles :"
+            echo "Xcode 26 introuvable sur cette machine. Xcode disponibles :"
             ls -d /Applications/Xcode*.app
             echo "Utilise le Xcode par défaut à la place."
             XCODE_APP=$(ls -d /Applications/Xcode.app 2>/dev/null || true)
@@ -32,14 +26,14 @@ jobs:
           xcodebuild -showsdks | grep -i ios || true
 
       - name: Generate app icon
-        run: |
+        script: |
           set -euo pipefail
           swift Tools/generate_icon.swift \
             "Stash/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"
           ls -lh "Stash/Assets.xcassets/AppIcon.appiconset/"
 
       - name: Build (no signing)
-        run: |
+        script: |
           set -euo pipefail
           xcodebuild build \
             -project Stash.xcodeproj \
@@ -47,7 +41,7 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -derivedDataPath "$DERIVED_DATA" \
+            -derivedDataPath "$CM_BUILD_DIR/build/DerivedData" \
             ASSETCATALOG_COMPILER_STANDALONE_ICON_BEHAVIOR=all \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
@@ -55,12 +49,13 @@ jobs:
             AD_HOC_CODE_SIGNING_ALLOWED=YES
 
       - name: Package unsigned .ipa
-        run: |
+        script: |
           set -euo pipefail
-          APP_PATH="$DERIVED_DATA/Build/Products/Release-iphoneos/Stash.app"
+          APP_PATH="$CM_BUILD_DIR/build/DerivedData/Build/Products/Release-iphoneos/Stash.app"
+          OUTPUT_DIR="$CM_BUILD_DIR/build/ipa"
           if [ ! -d "$APP_PATH" ]; then
             echo "Stash.app introuvable à $APP_PATH"
-            ls -R "$DERIVED_DATA/Build/Products" || true
+            ls -R "$CM_BUILD_DIR/build/DerivedData/Build/Products" || true
             exit 1
           fi
           mkdir -p "$OUTPUT_DIR/Payload"
@@ -70,10 +65,5 @@ jobs:
           rm -rf Payload
           echo "IPA créé :"
           ls -lh "$OUTPUT_DIR"
-
-      - name: Upload unsigned IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: Stash-unsigned-ipa
-          path: ${{ env.OUTPUT_DIR }}/Stash-unsigned.ipa
-          if-no-files-found: error
+    artifacts:
+      - build/ipa/Stash-unsigned.ipa
