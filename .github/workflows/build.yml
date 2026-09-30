@@ -1,0 +1,79 @@
+name: Build unsigned IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    env:
+      SCHEME: Stash
+      DERIVED_DATA: ${{ github.workspace }}/build/DerivedData
+      OUTPUT_DIR: ${{ github.workspace }}/build/ipa
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          # Sélectionne le Xcode le plus récent disponible (Xcode 26 pour le SDK iOS 26 / Liquid Glass).
+          XCODE_APP=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE_APP" ]; then
+            echo "Xcode 26 introuvable sur ce runner. Xcode disponibles :"
+            ls -d /Applications/Xcode*.app
+            echo "Utilise le Xcode par défaut à la place."
+            XCODE_APP=$(ls -d /Applications/Xcode.app 2>/dev/null || true)
+          fi
+          echo "Sélection de $XCODE_APP"
+          sudo xcode-select -switch "$XCODE_APP"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i ios || true
+
+      - name: Generate app icon
+        run: |
+          set -euo pipefail
+          swift Tools/generate_icon.swift \
+            "Stash/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"
+          ls -lh "Stash/Assets.xcassets/AppIcon.appiconset/"
+
+      - name: Build (no signing)
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project Stash.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath "$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Package unsigned .ipa
+        run: |
+          set -euo pipefail
+          APP_PATH="$DERIVED_DATA/Build/Products/Release-iphoneos/Stash.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Stash.app introuvable à $APP_PATH"
+            ls -R "$DERIVED_DATA/Build/Products" || true
+            exit 1
+          fi
+          mkdir -p "$OUTPUT_DIR/Payload"
+          cp -R "$APP_PATH" "$OUTPUT_DIR/Payload/"
+          cd "$OUTPUT_DIR"
+          zip -qry Stash-unsigned.ipa Payload
+          rm -rf Payload
+          echo "IPA créé :"
+          ls -lh "$OUTPUT_DIR"
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Stash-unsigned-ipa
+          path: ${{ env.OUTPUT_DIR }}/Stash-unsigned.ipa
+          if-no-files-found: error

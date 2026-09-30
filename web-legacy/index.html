@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0b0d12" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Stash" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <title>Stash — Mes cartes</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1 class="app-title">Stash</h1>
+    <button id="addBtn" class="btn-add" aria-label="Ajouter une carte">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+      </svg>
+    </button>
+  </header>
+
+  <main id="cardList" class="card-list" aria-live="polite"></main>
+
+  <!-- État vide -->
+  <section id="emptyState" class="empty-state" hidden>
+    <div class="empty-illustration" aria-hidden="true">🪪</div>
+    <h2>Aucune carte pour l'instant</h2>
+    <p>Ajoute ta première carte de fidélité, cadeau ou de membre. Tout reste stocké sur ton téléphone.</p>
+    <button id="emptyAddBtn" class="btn-primary">Ajouter une carte</button>
+  </section>
+
+  <!-- Formulaire d'ajout / édition -->
+  <div id="formOverlay" class="overlay" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="formTitle">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <h2 id="formTitle" class="sheet-title">Nouvelle carte</h2>
+      <form id="cardForm" novalidate>
+        <input type="hidden" id="cardId" />
+
+        <label class="field">
+          <span class="field-label">Nom de la carte</span>
+          <input type="text" id="cardName" required maxlength="40" placeholder="Ex. Carrefour, Fnac…" autocomplete="off" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Numéro / code</span>
+          <input type="text" id="cardCode" required maxlength="80" placeholder="Le numéro imprimé sur la carte" autocomplete="off" inputmode="text" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Type de code</span>
+          <select id="cardFormat">
+            <option value="auto">Automatique</option>
+            <option value="CODE128">Code-barres (CODE128)</option>
+            <option value="EAN13">Code-barres (EAN-13)</option>
+            <option value="QR">QR Code</option>
+          </select>
+        </label>
+
+        <div class="field">
+          <span class="field-label">Couleur</span>
+          <div id="colorPicker" class="color-picker" role="radiogroup" aria-label="Couleur de la carte"></div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" id="deleteBtn" class="btn-danger" hidden>Supprimer</button>
+          <button type="button" id="cancelBtn" class="btn-ghost">Annuler</button>
+          <button type="submit" class="btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Vue plein écran d'une carte -->
+  <div id="detailOverlay" class="detail-overlay" hidden>
+    <button id="detailClose" class="detail-close" aria-label="Fermer">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+      </svg>
+    </button>
+    <div class="detail-content">
+      <h2 id="detailName" class="detail-name"></h2>
+      <div class="barcode-box">
+        <div id="barcodeHolder" class="barcode-holder"></div>
+        <p id="detailCode" class="detail-code"></p>
+      </div>
+      <div class="detail-buttons">
+        <button id="detailEdit" class="btn-ghost">Modifier</button>
+      </div>
+      <p class="detail-hint">Présente ce code au lecteur en caisse.</p>
+    </div>
+  </div>
+
+  <!-- Bibliothèques de génération de codes (CDN, avec repli géré dans app.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
