@@ -182,7 +182,7 @@ enum CardValidator {
 /// Modèle unique pour les deux types de cartes.
 /// Les champs sensibles (numéro de CB) ne sont JAMAIS stockés en clair :
 /// ils vivent dans le Keychain via `SecureVault`, indexés par `id`.
-struct Card: Identifiable, Codable, Equatable {
+struct Card: Identifiable, Codable, Equatable, Hashable {
     var id: UUID
     var kind: CardKind
     var name: String
