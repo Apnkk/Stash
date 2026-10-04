@@ -381,7 +381,18 @@ struct CardTileView: View {
         .frame(height: 130)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
-            if let backgroundArt {
+            if let design = CardDesign.find(card.designID) {
+                design.image
+                    .resizable()
+                    .scaledToFill()
+                    .overlay(
+                        LinearGradient(
+                            colors: [.black.opacity(0.12), .black.opacity(0.55)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            } else if let backgroundArt {
                 Image(uiImage: backgroundArt)
                     .resizable()
                     .scaledToFill()
