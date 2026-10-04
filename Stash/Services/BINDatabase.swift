@@ -20,7 +20,7 @@ enum BINDatabase {
     }
 
     /// Un émetteur : ses préfixes BIN, son nom et ses couleurs de marque.
-    private struct Issuer {
+    struct Issuer {
         let name: String
         let colors: [String]
         /// Préfixes BIN (chaînes de chiffres). Le plus long préfixe qui
@@ -31,7 +31,7 @@ enum BINDatabase {
     /// Base embarquée des émetteurs français courants. Les préfixes sont des
     /// plages IIN publiques largement documentées ; ils identifient la banque,
     /// jamais le porteur. Couleurs = charte de marque approximative.
-    private static let issuers: [Issuer] = [
+    static let issuers: [Issuer] = [
         Issuer(
             name: "Crédit Agricole",
             colors: ["#006A4E", "#00A66C"],
@@ -45,7 +45,7 @@ enum BINDatabase {
         Issuer(
             name: "Société Générale",
             colors: ["#E9041E", "#1D1D1B"],
-            prefixes: ["497200", "497201", "513211", "455674", "497030"]
+            prefixes: ["497201", "513211", "455674", "497030"]
         ),
         Issuer(
             name: "Caisse d'Épargne",

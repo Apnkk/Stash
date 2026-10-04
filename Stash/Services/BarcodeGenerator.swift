@@ -14,6 +14,14 @@ enum BarcodeGenerator {
         if card.format != .auto { return card.format }
         let code = card.code
         if code.range(of: "^\\d{13}$", options: .regularExpression) != nil {
+            let digits = code.compactMap { $0.wholeNumberValue }
+            if digits.count == 13 && digits[12] == ean13CheckDigit(Array(digits.prefix(12))) {
+                return .ean13
+            }
+            // Clé de contrôle non valide pour EAN-13 : bascule sur CODE128 pour ne pas altérer les chiffres
+            return .code128
+        }
+        if code.range(of: "^\\d{12}$", options: .regularExpression) != nil {
             return .ean13
         }
         if code.range(of: "^[0-9A-Za-z\\-.$/+% ]{1,48}$", options: .regularExpression) != nil {
@@ -96,25 +104,24 @@ enum BarcodeGenerator {
     /// Construit la suite de modules (1 = barre, 0 = espace) d'un EAN-13
     /// valide, ou `nil` si la valeur n'est pas un EAN-13 exploitable.
     private static func ean13Modules(for code: String) -> [Bool]? {
-        var digits = code.compactMap { $0.wholeNumberValue }
+        let digits = code.compactMap { $0.wholeNumberValue }
         // Il faut 12 chiffres (clé calculée) ou 13 chiffres (clé fournie).
         guard digits.count == 12 || digits.count == 13 else { return nil }
         guard digits.allSatisfy({ (0...9).contains($0) }) else { return nil }
 
+        var completeDigits = digits
         if digits.count == 13 {
-            // Vérifie la clé fournie ; si elle est incohérente, on la recalcule.
+            // Vérifie la clé fournie : si elle est incorrecte, on refuse de générer un faux code !
             let provided = digits[12]
             let expected = ean13CheckDigit(Array(digits.prefix(12)))
-            if provided != expected {
-                digits[12] = expected
-            }
+            guard provided == expected else { return nil }
         } else {
-            digits.append(ean13CheckDigit(digits))
+            completeDigits.append(ean13CheckDigit(digits))
         }
 
-        let first = digits[0]
-        let leftDigits = Array(digits[1...6])
-        let rightDigits = Array(digits[7...12])
+        let first = completeDigits[0]
+        let leftDigits = Array(completeDigits[1...6])
+        let rightDigits = Array(completeDigits[7...12])
         let pattern = Array(EAN13.parity[first])
 
         var bits = ""
@@ -144,22 +151,21 @@ enum BarcodeGenerator {
         let totalModules = modules.count + quietModules * 2
         let width = totalModules * moduleWidth
         let height = max(moduleWidth * 20, 60)
+        let size = CGSize(width: width, height: height)
 
-        UIGraphicsBeginImageContextWithOptions(CGSize(width: width, height: height), true, 1)
-        defer { UIGraphicsEndImageContext() }
-        guard let ctx = UIGraphicsGetCurrentContext() else { return nil }
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { rendererContext in
+            let ctx = rendererContext.cgContext
+            // Fond blanc.
+            ctx.setFillColor(UIColor.white.cgColor)
+            ctx.fill(CGRect(origin: .zero, size: size))
 
-        // Fond blanc.
-        ctx.setFillColor(UIColor.white.cgColor)
-        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
-
-        // Barres noires.
-        ctx.setFillColor(UIColor.black.cgColor)
-        for (index, isBar) in modules.enumerated() where isBar {
-            let x = (quietModules + index) * moduleWidth
-            ctx.fill(CGRect(x: x, y: 0, width: moduleWidth, height: height))
+            // Barres noires.
+            ctx.setFillColor(UIColor.black.cgColor)
+            for (index, isBar) in modules.enumerated() where isBar {
+                let x = (quietModules + index) * moduleWidth
+                ctx.fill(CGRect(x: x, y: 0, width: moduleWidth, height: height))
+            }
         }
-
-        return UIGraphicsGetImageFromCurrentImageContext()
     }
 }

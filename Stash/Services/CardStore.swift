@@ -22,22 +22,46 @@ final class CardStore: ObservableObject {
 
     private let fileURL: URL
 
-    init() {
-        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        fileURL = dir.appendingPathComponent("cards.json")
+    init(fileURL: URL? = nil) {
+        if let customURL = fileURL {
+            self.fileURL = customURL
+        } else {
+            let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            self.fileURL = dir.appendingPathComponent("cards.json")
+        }
         load()
     }
 
     // MARK: - Chargement / sauvegarde
 
     private func load() {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            // Premier lancement : fichier absent, liste vide normale.
+            cards = []
+            return
+        }
+
         do {
             let data = try Data(contentsOf: fileURL)
             cards = try JSONDecoder().decode([Card].self, from: data)
+            persistenceError = nil
         } catch {
-            // Premier lancement ou fichier absent : liste vide, ce n'est pas une erreur.
+            // Fichier présent mais illisible ou corrompu : on NE doit PAS l'écraser.
+            // On le met en quarantaine pour préserver les données de l'utilisateur.
+            quarantineCorruptFile()
             cards = []
+            persistenceError = "Le fichier de cartes était corrompu ou illisible. Une copie de sécurité a été créée."
         }
+    }
+
+    /// Déplace un fichier corrompu vers un nom horodaté pour éviter toute perte irrémédiable.
+    private func quarantineCorruptFile() {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withYear, .withMonth, .withDay, .withTime]
+        let timestamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let corruptURL = fileURL.deletingLastPathComponent()
+            .appendingPathComponent("cards.corrupt-\(timestamp).json")
+        try? FileManager.default.moveItem(at: fileURL, to: corruptURL)
     }
 
     /// Écrit la liste sur disque. En cas d'échec, publie l'erreur pour l'UI.

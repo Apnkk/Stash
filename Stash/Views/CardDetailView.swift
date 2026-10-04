@@ -56,7 +56,7 @@ struct CardDetailView: View {
                 // La carte fidélité garde un bandeau titre ; la carte bancaire
                 // affiche sa propre carte réaliste (RealisticCardView) et n'a
                 // donc pas besoin du header.
-                if card.kind != .bank {
+                if currentCard.kind != .bank {
                     header
                     loyaltyContent
                 } else {
@@ -69,7 +69,7 @@ struct CardDetailView: View {
             }
             .padding(20)
         }
-        .navigationTitle(card.name)
+        .navigationTitle(currentCard.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -130,6 +130,11 @@ struct CardDetailView: View {
             isCaptured = Self.activeScreen.isCaptured
             if isCaptured, revealedNumber != nil { hide() }
         }
+        .onChange(of: store.cards) { _, newCards in
+            if !newCards.contains(where: { $0.id == card.id }) {
+                dismiss()
+            }
+        }
     }
 
     /// Renvoie la version à jour de la carte depuis le store (après édition).
@@ -141,13 +146,13 @@ struct CardDetailView: View {
         RoundedRectangle(cornerRadius: 20, style: .continuous)
             .fill(
                 LinearGradient(
-                    colors: [Color(hex: card.colorHex), Color(hex: card.colorHex).opacity(0.75)],
+                    colors: [Color(hex: currentCard.colorHex), Color(hex: currentCard.colorHex).opacity(0.75)],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 )
             )
             .frame(height: 90)
             .overlay(
-                Text(card.name)
+                Text(currentCard.name)
                     .font(.title3.weight(.bold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 20),

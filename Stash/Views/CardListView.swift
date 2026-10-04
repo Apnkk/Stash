@@ -16,7 +16,11 @@ struct CardListView: View {
         guard !searchText.isEmpty else { return store.cards }
         let query = searchText.lowercased()
         return store.cards.filter {
-            $0.name.lowercased().contains(query) || $0.code.lowercased().contains(query)
+            $0.name.lowercased().contains(query)
+            || $0.code.lowercased().contains(query)
+            || $0.bankName.lowercased().contains(query)
+            || $0.note.lowercased().contains(query)
+            || $0.lastFour.contains(query)
         }
     }
 
