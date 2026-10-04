@@ -14,7 +14,10 @@ enum BarcodeGenerator {
         if card.format != .auto { return card.format }
         let code = card.code.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // 8 chiffres -> EAN-8
+        // 7 ou 8 chiffres -> EAN-8
+        if code.range(of: "^\\d{7}$", options: .regularExpression) != nil {
+            return .ean8
+        }
         if code.range(of: "^\\d{8}$", options: .regularExpression) != nil {
             let digits = code.compactMap { $0.wholeNumberValue }
             if digits.count == 8 && digits[7] == ean8CheckDigit(Array(digits.prefix(7))) {
@@ -23,13 +26,18 @@ enum BarcodeGenerator {
             return .code128
         }
 
-        // 12 chiffres -> UPC-A
+        // 11 chiffres -> UPC-A à compléter
+        if code.range(of: "^\\d{11}$", options: .regularExpression) != nil {
+            return .upca
+        }
+
+        // 12 chiffres -> UPC-A si clé valide, sinon corps de 12 chiffres pour EAN-13
         if code.range(of: "^\\d{12}$", options: .regularExpression) != nil {
             let digits = code.compactMap { $0.wholeNumberValue }
             if digits.count == 12 && digits[11] == upcaCheckDigit(Array(digits.prefix(11))) {
                 return .upca
             }
-            return .code128
+            return .ean13
         }
 
         // 13 chiffres -> EAN-13
