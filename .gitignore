@@ -30,6 +30,8 @@ Carthage/Build/
 
 # Dossier de travail local (vide, assets non versionnés)
 card/
+CardArt/
+dist/
 
 # Tailles d'icône générées au build par Tools/generate_icon.swift (ignorées),
 # SAUF l'image source AppIcon-1024.png qui doit être versionnée pour le CI.
