@@ -27,7 +27,7 @@ enum AutoBackupService {
 
         do {
             let bookmarkData = try url.bookmarkData(
-                options: .suitableForBookmarkFile,
+                options: [],
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
             )
@@ -52,7 +52,7 @@ enum AutoBackupService {
         var isStale = false
         guard let folderURL = try? URL(
             resolvingBookmarkData: bookmarkData,
-            options: .withSecurityScope,
+            options: [],
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
         ) else {
