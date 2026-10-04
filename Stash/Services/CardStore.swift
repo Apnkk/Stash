@@ -125,11 +125,26 @@ final class CardStore: ObservableObject {
             lastAddedCardID = toSave.id
         }
         persist()
+        ExpiryReminderService.scheduleReminders(for: toSave)
     }
 
     /// Efface le marqueur de dernière carte ajoutée (après l'animation d'accueil).
     func clearLastAdded() {
         lastAddedCardID = nil
+    }
+
+    /// Bascule l'état favori d'une carte et persiste le changement.
+    func toggleFavorite(_ card: Card) {
+        guard let idx = cards.firstIndex(where: { $0.id == card.id }) else { return }
+        cards[idx].isFavorite.toggle()
+        persist()
+    }
+
+    /// Enregistre la consultation / utilisation récente de la carte.
+    func markUsed(_ card: Card) {
+        guard let idx = cards.firstIndex(where: { $0.id == card.id }) else { return }
+        cards[idx].lastUsedAt = Date()
+        persist()
     }
 
     /// Supprime une carte et son éventuel secret dans le Keychain.
@@ -141,6 +156,7 @@ final class CardStore: ObservableObject {
             _ = try? SecureVault.delete(card.id.uuidString)
         }
         ArtVault.delete(card.id.uuidString)
+        ExpiryReminderService.cancelReminders(for: card.id)
         persist()
     }
 
@@ -166,6 +182,7 @@ final class CardStore: ObservableObject {
                 _ = try? SecureVault.delete(card.id.uuidString)
             }
             ArtVault.delete(card.id.uuidString)
+            ExpiryReminderService.cancelReminders(for: card.id)
         }
         cards.remove(atOffsets: offsets)
         persist()

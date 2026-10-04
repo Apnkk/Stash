@@ -72,7 +72,16 @@ struct CardDetailView: View {
         .navigationTitle(currentCard.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    Haptics.light()
+                    store.toggleFavorite(currentCard)
+                } label: {
+                    Image(systemName: currentCard.isFavorite ? "star.fill" : "star")
+                        .foregroundStyle(currentCard.isFavorite ? .yellow : .primary)
+                }
+                .accessibilityLabel(currentCard.isFavorite ? "Retirer des favoris" : "Ajouter aux favoris")
+
                 Button("Modifier") { showingEdit = true }
             }
         }
@@ -86,6 +95,7 @@ struct CardDetailView: View {
             }
         }
         .onAppear {
+            store.markUsed(currentCard)
             if card.kind != .bank {
                 let screen = Self.activeScreen
                 previousBrightness = screen.brightness

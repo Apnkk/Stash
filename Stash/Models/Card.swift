@@ -221,6 +221,12 @@ struct Card: Identifiable, Codable, Equatable {
     var note: String                 // note libre de l'utilisateur
     var createdAt: Date              // date d'ajout
 
+    /// Carte épinglée en favori (affichée en tête de liste et avec une étoile).
+    var isFavorite: Bool
+
+    /// Horodatage de dernière consultation ou utilisation de la carte.
+    var lastUsedAt: Date?
+
     /// L'utilisateur a-t-il associé une image de fond à cette carte ? Le fichier
     /// lui-même vit dans `ArtVault` (dossier Application Support), indexé par
     /// `id` ; on ne garde ici qu'un drapeau non sensible pour savoir s'il faut
@@ -243,7 +249,9 @@ struct Card: Identifiable, Codable, Equatable {
         bankColorHex: String = "",
         note: String = "",
         createdAt: Date = Date(),
-        hasCustomArt: Bool = false
+        hasCustomArt: Bool = false,
+        isFavorite: Bool = false,
+        lastUsedAt: Date? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -261,12 +269,14 @@ struct Card: Identifiable, Codable, Equatable {
         self.note = note
         self.createdAt = createdAt
         self.hasCustomArt = hasCustomArt
+        self.isFavorite = isFavorite
+        self.lastUsedAt = lastUsedAt
     }
 
     // Décodage tolérant : les cartes déjà enregistrées (avant l'ajout de
-    // `note`/`createdAt`) ne possèdent pas ces clés → valeurs par défaut.
+    // `note`/`createdAt`/`isFavorite`/`lastUsedAt`) ne possèdent pas ces clés → valeurs par défaut.
     enum CodingKeys: String, CodingKey {
-        case id, kind, name, colorHex, code, format, holder, expiry, lastFour, networkRaw, manualNetworkRaw, bankName, bankColorHex, note, createdAt, hasCustomArt
+        case id, kind, name, colorHex, code, format, holder, expiry, lastFour, networkRaw, manualNetworkRaw, bankName, bankColorHex, note, createdAt, hasCustomArt, isFavorite, lastUsedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -287,6 +297,8 @@ struct Card: Identifiable, Codable, Equatable {
         note     = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         hasCustomArt = try c.decodeIfPresent(Bool.self, forKey: .hasCustomArt) ?? false
+        isFavorite = try c.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+        lastUsedAt = try c.decodeIfPresent(Date.self, forKey: .lastUsedAt)
     }
 
     /// Réseau bancaire utilisé pour l'apparence. Priorité au choix MANUEL de

@@ -12,25 +12,32 @@ struct CardListView: View {
     /// Carte mise en avant à l'accueil juste après son ajout.
     @State private var highlightedID: UUID?
 
+    @AppStorage("card_sort_option") private var sortOptionRaw = CardSortOption.manual.rawValue
+    @AppStorage("pin_favorites") private var pinFavorites = true
+    @State private var filterOption: CardFilterOption = .all
+
     private var filteredCards: [Card] {
-        guard !searchText.isEmpty else { return store.cards }
-        let query = searchText.lowercased()
-        return store.cards.filter {
-            $0.name.lowercased().contains(query)
-            || $0.code.lowercased().contains(query)
-            || $0.bankName.lowercased().contains(query)
-            || $0.note.lowercased().contains(query)
-            || $0.lastFour.contains(query)
-        }
+        let sortOption = CardSortOption(rawValue: sortOptionRaw) ?? .manual
+        return store.cards
+            .filtered(by: filterOption, query: searchText)
+            .sorted(by: sortOption, pinFavorites: pinFavorites)
     }
 
     var body: some View {
         NavigationStack {
-            Group {
-                if store.cards.isEmpty {
-                    emptyState
-                } else {
-                    cardGrid
+            VStack(spacing: 0) {
+                if !store.cards.isEmpty {
+                    filterBar
+                }
+
+                Group {
+                    if store.cards.isEmpty {
+                        emptyState
+                    } else if filteredCards.isEmpty {
+                        noResultsState
+                    } else {
+                        cardGrid
+                    }
                 }
             }
             .navigationTitle("Stash")
@@ -44,7 +51,26 @@ struct CardListView: View {
                     }
                     .glassButtonIfAvailable()
                 }
-                ToolbarItem(placement: .primaryAction) {
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Menu {
+                        Section("Trier par") {
+                            Picker("Tri", selection: $sortOptionRaw) {
+                                ForEach(CardSortOption.allCases) { option in
+                                    Label(option.label, systemImage: option.icon).tag(option.rawValue)
+                                }
+                            }
+                        }
+                        Section {
+                            Toggle(isOn: $pinFavorites) {
+                                Label("Épingler les favoris", systemImage: "star.fill")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
+                    .glassButtonIfAvailable()
+
                     Button {
                         Haptics.medium()
                         showingTypePicker = true
@@ -70,6 +96,58 @@ struct CardListView: View {
         }
     }
 
+    private var filterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(CardFilterOption.allCases) { filter in
+                    Button {
+                        Haptics.selection()
+                        withAnimation(Motion.snappy) {
+                            filterOption = filter
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: filter.icon)
+                                .font(.caption2)
+                            Text(filter.label)
+                                .font(.caption.weight(filterOption == filter ? .semibold : .medium))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(
+                            filterOption == filter ? Color.stashRed : Color.secondary.opacity(0.15),
+                            in: Capsule()
+                        )
+                        .foregroundStyle(filterOption == filter ? Color.white : Color.primary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+        }
+    }
+
+    private var noResultsState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 40))
+                .foregroundStyle(.secondary)
+            Text("Aucune carte trouvée")
+                .font(.headline)
+            Text("Essaie de modifier ta recherche ou le filtre actif.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(32)
+    }
+
+    private var canReorder: Bool {
+        searchText.isEmpty && filterOption == .all && sortOptionRaw == CardSortOption.manual.rawValue
+    }
+
     private var cardGrid: some View {
         ScrollViewReader { proxy in
             List {
@@ -92,9 +170,23 @@ struct CardListView: View {
                     .listRowBackground(Color.clear)
                     .appearInCascade(index: index)
                     .transition(.cardAppear)
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        Button {
+                            Haptics.light()
+                            withAnimation(Motion.snappy) {
+                                store.toggleFavorite(card)
+                            }
+                        } label: {
+                            Label(
+                                card.isFavorite ? "Défavoriser" : "Favori",
+                                systemImage: card.isFavorite ? "star.slash.fill" : "star.fill"
+                            )
+                        }
+                        .tint(.yellow)
+                    }
                 }
-                .onMove(perform: searchText.isEmpty ? move : nil)
-                .onDelete(perform: searchText.isEmpty ? deleteCards : nil)
+                .onMove(perform: canReorder ? move : nil)
+                .onDelete(perform: deleteCards)
             }
             .listStyle(.plain)
             .animation(Motion.standard, value: filteredCards.map(\.id))
@@ -132,11 +224,12 @@ struct CardListView: View {
 
     /// Supprime les cartes correspondant aux positions de la liste filtrée.
     private func deleteCards(at offsets: IndexSet) {
-        let ids = offsets.map { filteredCards[$0].id }
-        let storeOffsets = IndexSet(store.cards.enumerated().compactMap { ids.contains($0.element.id) ? $0.offset : nil })
+        let toDelete = offsets.map { filteredCards[$0] }
         Haptics.rigid()
         withAnimation(Motion.standard) {
-            store.delete(at: storeOffsets)
+            for card in toDelete {
+                store.delete(card)
+            }
         }
     }
 
@@ -230,7 +323,7 @@ struct CardTileView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(spacing: 8) {
                 if card.kind == .bank {
                     // Puce EMV miniature, pour évoquer la carte physique.
                     miniChip
@@ -238,6 +331,16 @@ struct CardTileView: View {
                     Image(systemName: card.kind == .other ? "rectangle.stack.fill" : "barcode")
                         .foregroundStyle(.white.opacity(0.9))
                 }
+
+                if card.isFavorite {
+                    Image(systemName: "star.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.yellow)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(.black.opacity(0.35), in: Capsule())
+                }
+
                 Spacer()
                 // Logo réseau (Visa/Mastercard/…) figé à la saisie, sinon le
                 // libellé du type de carte.

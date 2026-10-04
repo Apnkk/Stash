@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var messageIsError = false
 
     @AppStorage(AutoLockDelay.storageKey) private var autoLockRaw = AutoLockDelay.thirtySeconds.rawValue
+    @AppStorage(ExpiryReminderService.settingsKey) private var expiryRemindersEnabled = false
 
     var body: some View {
         NavigationStack {
@@ -31,6 +32,28 @@ struct SettingsView: View {
                     Text("Sécurité")
                 } footer: {
                     Text("Délai avant que Stash ne redemande Face ID / Touch ID après être passé en arrière-plan. « Immédiat » reverrouille dès que tu quittes l'app.")
+                }
+
+                Section {
+                    Toggle("Rappels d'expiration", isOn: $expiryRemindersEnabled)
+                        .onChange(of: expiryRemindersEnabled) { _, enabled in
+                            Task {
+                                if enabled {
+                                    let granted = await ExpiryReminderService.requestAuthorization()
+                                    if granted {
+                                        await ExpiryReminderService.rescheduleAll(for: store.cards)
+                                    } else {
+                                        expiryRemindersEnabled = false
+                                    }
+                                } else {
+                                    ExpiryReminderService.cancelAll()
+                                }
+                            }
+                        }
+                } header: {
+                    Text("Notifications")
+                } footer: {
+                    Text("Reçois une notification locale 30 jours avant et au début du mois d'expiration de tes cartes bancaires.")
                 }
 
                 Section {
