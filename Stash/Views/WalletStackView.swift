@@ -168,12 +168,14 @@ private struct WalletStackItemView: View {
             // Carte principale
             Button(action: onTap) {
                 if card.kind == .bank {
-                    RealisticCardView(card: card, showsDetails: isExpanded)
+                    RealisticCardView(card: card)
                 } else {
                     loyaltyPassView
                 }
             }
             .buttonStyle(WalletCardButtonStyle())
+            .accessibilityLabel("\(card.name), \(card.kind == .bank ? "Carte bancaire" : "Carte de fidélité")")
+            .accessibilityHint(isExpanded ? "Touchez pour replier la carte" : "Touchez pour déplier la carte et afficher les actions")
             .shadow(
                 color: Color.black.opacity(isExpanded ? 0.4 : 0.22),
                 radius: isExpanded ? 24 : 10,

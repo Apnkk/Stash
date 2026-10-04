@@ -59,6 +59,11 @@ enum BarcodeGenerator {
         return .qr
     }
 
+    /// Alias pratique pour produire l'image d'un code-barres.
+    static func generate(for card: Card, scale: CGFloat = 10) -> UIImage? {
+        image(for: card, scale: scale)
+    }
+
     /// Produit une `UIImage` nette (mise à l'échelle) pour la carte donnée.
     /// Renvoie `nil` si la valeur est invalide pour le format demandé.
     static func image(for card: Card, scale: CGFloat = 10) -> UIImage? {
