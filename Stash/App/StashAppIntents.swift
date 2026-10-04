@@ -25,15 +25,17 @@ struct CardEntity: AppEntity {
 
 /// Requête d'entités pour retrouver ou suggérer des cartes à Siri et aux Raccourcis.
 struct CardQuery: EntityQuery {
+    @MainActor
     func entities(for identifiers: [UUID]) async throws -> [CardEntity] {
-        let store = await CardStore()
+        let store = CardStore()
         return store.cards
             .filter { $0.kind != .bank && identifiers.contains($0.id) }
             .map { CardEntity(id: $0.id, name: $0.name) }
     }
 
+    @MainActor
     func suggestedEntities() async throws -> [CardEntity] {
-        let store = await CardStore()
+        let store = CardStore()
         return store.cards
             .filter { $0.kind != .bank }
             .map { CardEntity(id: $0.id, name: $0.name) }
