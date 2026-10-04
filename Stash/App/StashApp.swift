@@ -29,11 +29,20 @@ struct StashApp: App {
                         .transition(.opacity)
                         .zIndex(10)
                 }
+
+                // Écran de confidentialité pour le multitâche (App Switcher) :
+                // évite que les cartes ne soient visibles dans les captures du sélecteur d'apps.
+                if scenePhase != .active && lock.isUnlocked {
+                    PrivacyShieldView()
+                        .transition(.opacity)
+                        .zIndex(20)
+                }
             }
             .background(Color.black.ignoresSafeArea())
             .tint(Color.stashRed)
             .animation(Motion.standard, value: lock.isUnlocked)
             .animation(Motion.soft, value: hasSeenOnboarding)
+            .animation(.easeInOut(duration: 0.15), value: scenePhase != .active)
             .preferredColorScheme(.dark)
             .onAppear { lock.unlockIfNeeded() }
             .onChange(of: scenePhase) { _, newPhase in
@@ -142,5 +151,18 @@ final class AppLock: ObservableObject {
     func lock() {
         isUnlocked = false
         lastError = nil
+    }
+}
+
+/// Écran protecteur affiché lorsque l'application passe en arrière-plan ou dans le sélecteur d'apps.
+private struct PrivacyShieldView: View {
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 64))
+                .foregroundStyle(Color.stashRed.opacity(0.85))
+        }
+        .allowsHitTesting(false)
     }
 }

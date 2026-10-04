@@ -17,9 +17,9 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.9.1</string>
+    <string>2.0.0</string>
     <key>CFBundleVersion</key>
-    <string>10</string>
+    <string>20</string>
     <key>CFBundleIcons</key>
     <dict>
         <key>CFBundlePrimaryIcon</key>
@@ -36,6 +36,8 @@
     <true/>
     <key>NSFaceIDUsageDescription</key>
     <string>Stash utilise Face ID pour déverrouiller l'app et protéger tes cartes bancaires.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Stash utilise la caméra pour scanner les codes-barres et les numéros de carte. Vos données restent strictement sur votre appareil.</string>
     <key>UILaunchScreen</key>
     <dict/>
     <key>UIApplicationSceneManifest</key>
@@ -49,5 +51,27 @@
     </array>
     <key>UIUserInterfaceStyle</key>
     <string>Dark</string>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.stash.backup</string>
+            <key>UTTypeDescription</key>
+            <string>Sauvegarde chiffrée Stash</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>stashbackup</string>
+                </array>
+                <key>public.mime-type</key>
+                <string>application/octet-stream</string>
+            </dict>
+        </dict>
+    </array>
 </dict>
 </plist>

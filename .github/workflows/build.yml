@@ -38,6 +38,22 @@ jobs:
             "Stash/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"
           ls -lh "Stash/Assets.xcassets/AppIcon.appiconset/"
 
+      - name: Run unit tests
+        run: |
+          set -euo pipefail
+          echo "Runtimes disponibles :"
+          xcrun simctl list runtimes
+          RUNTIME_ID=$(xcrun simctl list runtimes -j | jq -r '.runtimes[] | select((.isAvailable // true) and (.identifier | contains("iOS"))) | .identifier' | tail -1)
+          echo "Runtime sélectionné : $RUNTIME_ID"
+          SIM_ID=$(xcrun simctl create "StashTestDevice" "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro" "$RUNTIME_ID")
+          echo "Simulateur créé avec succès : $SIM_ID"
+          xcodebuild test \
+            -project Stash.xcodeproj \
+            -scheme "$SCHEME" \
+            -destination "platform=iOS Simulator,id=$SIM_ID" \
+            -derivedDataPath "$DERIVED_DATA"
+          xcrun simctl delete "$SIM_ID" || true
+
       - name: Build (no signing)
         run: |
           set -euo pipefail

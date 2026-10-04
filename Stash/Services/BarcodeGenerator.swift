@@ -3,8 +3,8 @@ import CoreImage
 import CoreImage.CIFilterBuiltins
 import UIKit
 
-/// Génère l'image d'un code-barres ou d'un QR à partir d'une valeur texte,
-/// entièrement hors ligne via CoreImage (aucune dépendance externe).
+/// Génère l'image d'un code-barres (1D ou 2D) à partir d'une valeur texte,
+/// entièrement hors ligne via CoreImage et encodeurs natifs (aucune dépendance).
 enum BarcodeGenerator {
 
     private static let context = CIContext()
@@ -12,14 +12,56 @@ enum BarcodeGenerator {
     /// Détermine le format effectif quand l'utilisateur a laissé "auto".
     static func resolvedFormat(for card: Card) -> BarcodeFormat {
         if card.format != .auto { return card.format }
-        let code = card.code
-        if code.range(of: "^\\d{13}$", options: .regularExpression) != nil {
+        let code = card.code.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // 7 ou 8 chiffres -> EAN-8
+        if code.range(of: "^\\d{7}$", options: .regularExpression) != nil {
+            return .ean8
+        }
+        if code.range(of: "^\\d{8}$", options: .regularExpression) != nil {
+            let digits = code.compactMap { $0.wholeNumberValue }
+            if digits.count == 8 && digits[7] == ean8CheckDigit(Array(digits.prefix(7))) {
+                return .ean8
+            }
+            return .code128
+        }
+
+        // 11 chiffres -> UPC-A à compléter
+        if code.range(of: "^\\d{11}$", options: .regularExpression) != nil {
+            return .upca
+        }
+
+        // 12 chiffres -> UPC-A si clé valide, sinon corps de 12 chiffres pour EAN-13
+        if code.range(of: "^\\d{12}$", options: .regularExpression) != nil {
+            let digits = code.compactMap { $0.wholeNumberValue }
+            if digits.count == 12 && digits[11] == upcaCheckDigit(Array(digits.prefix(11))) {
+                return .upca
+            }
             return .ean13
         }
+
+        // 13 chiffres -> EAN-13
+        if code.range(of: "^\\d{13}$", options: .regularExpression) != nil {
+            let digits = code.compactMap { $0.wholeNumberValue }
+            if digits.count == 13 && digits[12] == ean13CheckDigit(Array(digits.prefix(12))) {
+                return .ean13
+            }
+            // Clé invalide pour EAN-13 : bascule sur CODE128 pour ne pas altérer les chiffres
+            return .code128
+        }
+
+        // Alphanumérique jusqu'à 48 caractères -> Code128
         if code.range(of: "^[0-9A-Za-z\\-.$/+% ]{1,48}$", options: .regularExpression) != nil {
             return .code128
         }
+
+        // Valeur complexe, URL ou texte long -> QR Code
         return .qr
+    }
+
+    /// Alias pratique pour produire l'image d'un code-barres.
+    static func generate(for card: Card, scale: CGFloat = 10) -> UIImage? {
+        image(for: card, scale: scale)
     }
 
     /// Produit une `UIImage` nette (mise à l'échelle) pour la carte donnée.
@@ -35,17 +77,34 @@ enum BarcodeGenerator {
             filter.message = data
             filter.correctionLevel = "M"
             outputImage = filter.outputImage
+
         case .code128:
             let filter = CIFilter.code128BarcodeGenerator()
             filter.message = data
             filter.quietSpace = 2
             outputImage = filter.outputImage
+
+        case .pdf417:
+            let filter = CIFilter.pdf417BarcodeGenerator()
+            filter.message = data
+            outputImage = filter.outputImage
+
+        case .aztec:
+            let filter = CIFilter.aztecCodeGenerator()
+            filter.message = data
+            outputImage = filter.outputImage
+
         case .ean13:
-            // CoreImage n'a pas de générateur EAN-13 : on encode nous-mêmes
-            // le motif de barres, puis on le rend en image nette.
             return ean13Image(for: card.code, scale: scale)
+
+        case .ean8:
+            return ean8Image(for: card.code, scale: scale)
+
+        case .upca:
+            return upcaImage(for: card.code, scale: scale)
+
         case .auto:
-            return nil // résolu plus haut, jamais atteint
+            return nil
         }
 
         guard let ciImage = outputImage else { return nil }
@@ -59,25 +118,19 @@ enum BarcodeGenerator {
 
     // MARK: - Encodage EAN-13
 
-    /// Tables d'encodage EAN-13.
-    /// Chaque motif est décrit par ses 7 modules (barre = 1, espace = 0).
     private enum EAN13 {
-        /// Éléments de gauche, ensemble A (impair).
         static let left_A = [
             "0001101", "0011001", "0010011", "0111101", "0100011",
             "0110001", "0101111", "0111011", "0110111", "0001011"
         ]
-        /// Éléments de gauche, ensemble B (pair).
         static let left_B = [
             "0100111", "0110011", "0011011", "0100001", "0011101",
             "0111001", "0000101", "0010001", "0001001", "0010111"
         ]
-        /// Éléments de droite, ensemble C.
         static let right_C = [
             "1110010", "1100110", "1101100", "1000010", "1011100",
             "1001110", "1010000", "1000100", "1001000", "1110100"
         ]
-        /// Choix A/B des 6 premiers chiffres, en fonction du premier chiffre.
         static let parity = [
             "AAAAAA", "AABABB", "AABBAB", "AABBBA", "ABAABB",
             "ABBAAB", "ABBBAA", "ABABAB", "ABABBA", "ABBABA"
@@ -85,7 +138,7 @@ enum BarcodeGenerator {
     }
 
     /// Calcule la clé de contrôle EAN-13 pour 12 chiffres.
-    private static func ean13CheckDigit(_ digits: [Int]) -> Int {
+    static func ean13CheckDigit(_ digits: [Int]) -> Int {
         var sum = 0
         for (index, digit) in digits.enumerated() {
             sum += (index % 2 == 0) ? digit : digit * 3
@@ -93,32 +146,27 @@ enum BarcodeGenerator {
         return (10 - (sum % 10)) % 10
     }
 
-    /// Construit la suite de modules (1 = barre, 0 = espace) d'un EAN-13
-    /// valide, ou `nil` si la valeur n'est pas un EAN-13 exploitable.
-    private static func ean13Modules(for code: String) -> [Bool]? {
-        var digits = code.compactMap { $0.wholeNumberValue }
-        // Il faut 12 chiffres (clé calculée) ou 13 chiffres (clé fournie).
+    static func ean13Modules(for code: String) -> [Bool]? {
+        let digits = code.compactMap { $0.wholeNumberValue }
         guard digits.count == 12 || digits.count == 13 else { return nil }
         guard digits.allSatisfy({ (0...9).contains($0) }) else { return nil }
 
+        var completeDigits = digits
         if digits.count == 13 {
-            // Vérifie la clé fournie ; si elle est incohérente, on la recalcule.
             let provided = digits[12]
             let expected = ean13CheckDigit(Array(digits.prefix(12)))
-            if provided != expected {
-                digits[12] = expected
-            }
+            guard provided == expected else { return nil }
         } else {
-            digits.append(ean13CheckDigit(digits))
+            completeDigits.append(ean13CheckDigit(digits))
         }
 
-        let first = digits[0]
-        let leftDigits = Array(digits[1...6])
-        let rightDigits = Array(digits[7...12])
+        let first = completeDigits[0]
+        let leftDigits = Array(completeDigits[1...6])
+        let rightDigits = Array(completeDigits[7...12])
         let pattern = Array(EAN13.parity[first])
 
         var bits = ""
-        bits += "101" // garde de début
+        bits += "101" // garde début
 
         for (index, digit) in leftDigits.enumerated() {
             bits += (pattern[index] == "A") ? EAN13.left_A[digit] : EAN13.left_B[digit]
@@ -130,36 +178,121 @@ enum BarcodeGenerator {
             bits += EAN13.right_C[digit]
         }
 
-        bits += "101" // garde de fin
+        bits += "101" // garde fin
+        return bits.map { $0 == "1" }
+    }
+
+    private static func ean13Image(for code: String, scale: CGFloat) -> UIImage? {
+        guard let modules = ean13Modules(for: code) else { return nil }
+        return renderBarcode(modules: modules, scale: scale)
+    }
+
+    // MARK: - Encodage EAN-8
+
+    /// Clé de contrôle EAN-8 pour 7 chiffres.
+    static func ean8CheckDigit(_ digits: [Int]) -> Int {
+        var sum = 0
+        for (index, digit) in digits.enumerated() {
+            sum += (index % 2 == 0) ? digit * 3 : digit
+        }
+        return (10 - (sum % 10)) % 10
+    }
+
+    static func ean8Modules(for code: String) -> [Bool]? {
+        let digits = code.compactMap { $0.wholeNumberValue }
+        guard digits.count == 7 || digits.count == 8 else { return nil }
+        guard digits.allSatisfy({ (0...9).contains($0) }) else { return nil }
+
+        var completeDigits = digits
+        if digits.count == 8 {
+            let provided = digits[7]
+            let expected = ean8CheckDigit(Array(digits.prefix(7)))
+            guard provided == expected else { return nil }
+        } else {
+            completeDigits.append(ean8CheckDigit(digits))
+        }
+
+        let leftDigits = Array(completeDigits[0...3])
+        let rightDigits = Array(completeDigits[4...7])
+
+        var bits = "101" // garde début
+        for digit in leftDigits {
+            bits += EAN13.left_A[digit]
+        }
+        bits += "01010" // garde centrale
+        for digit in rightDigits {
+            bits += EAN13.right_C[digit]
+        }
+        bits += "101" // garde fin
 
         return bits.map { $0 == "1" }
     }
 
-    /// Produit l'image d'un code EAN-13 à partir des modules encodés.
-    private static func ean13Image(for code: String, scale: CGFloat) -> UIImage? {
-        guard let modules = ean13Modules(for: code), !modules.isEmpty else { return nil }
+    private static func ean8Image(for code: String, scale: CGFloat) -> UIImage? {
+        guard let modules = ean8Modules(for: code) else { return nil }
+        return renderBarcode(modules: modules, scale: scale)
+    }
+
+    // MARK: - Encodage UPC-A
+
+    /// Clé de contrôle UPC-A pour 11 chiffres.
+    static func upcaCheckDigit(_ digits: [Int]) -> Int {
+        var sum = 0
+        for (index, digit) in digits.enumerated() {
+            sum += (index % 2 == 0) ? digit * 3 : digit
+        }
+        return (10 - (sum % 10)) % 10
+    }
+
+    static func upcaModules(for code: String) -> [Bool]? {
+        let digits = code.compactMap { $0.wholeNumberValue }
+        guard digits.count == 11 || digits.count == 12 else { return nil }
+        guard digits.allSatisfy({ (0...9).contains($0) }) else { return nil }
+
+        var completeDigits = digits
+        if digits.count == 12 {
+            let provided = digits[11]
+            let expected = upcaCheckDigit(Array(digits.prefix(11)))
+            guard provided == expected else { return nil }
+        } else {
+            completeDigits.append(upcaCheckDigit(digits))
+        }
+
+        // UPC-A équivaut à un code EAN-13 débutant par 0
+        let ean13String = "0" + completeDigits.map(String.init).joined()
+        return ean13Modules(for: ean13String)
+    }
+
+    private static func upcaImage(for code: String, scale: CGFloat) -> UIImage? {
+        guard let modules = upcaModules(for: code) else { return nil }
+        return renderBarcode(modules: modules, scale: scale)
+    }
+
+    // MARK: - Rendu graphique générique 1D
+
+    private static func renderBarcode(modules: [Bool], scale: CGFloat) -> UIImage? {
+        guard !modules.isEmpty else { return nil }
 
         let moduleWidth = max(1, Int(scale.rounded()))
         let quietModules = 9            // marge silencieuse recommandée à gauche/droite
         let totalModules = modules.count + quietModules * 2
         let width = totalModules * moduleWidth
         let height = max(moduleWidth * 20, 60)
+        let size = CGSize(width: width, height: height)
 
-        UIGraphicsBeginImageContextWithOptions(CGSize(width: width, height: height), true, 1)
-        defer { UIGraphicsEndImageContext() }
-        guard let ctx = UIGraphicsGetCurrentContext() else { return nil }
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { rendererContext in
+            let ctx = rendererContext.cgContext
+            // Fond blanc.
+            ctx.setFillColor(UIColor.white.cgColor)
+            ctx.fill(CGRect(origin: .zero, size: size))
 
-        // Fond blanc.
-        ctx.setFillColor(UIColor.white.cgColor)
-        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
-
-        // Barres noires.
-        ctx.setFillColor(UIColor.black.cgColor)
-        for (index, isBar) in modules.enumerated() where isBar {
-            let x = (quietModules + index) * moduleWidth
-            ctx.fill(CGRect(x: x, y: 0, width: moduleWidth, height: height))
+            // Barres noires.
+            ctx.setFillColor(UIColor.black.cgColor)
+            for (index, isBar) in modules.enumerated() where isBar {
+                let x = (quietModules + index) * moduleWidth
+                ctx.fill(CGRect(x: x, y: 0, width: moduleWidth, height: height))
+            }
         }
-
-        return UIGraphicsGetImageFromCurrentImageContext()
     }
 }

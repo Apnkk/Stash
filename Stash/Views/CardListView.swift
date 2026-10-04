@@ -1,5 +1,18 @@
 import SwiftUI
 
+enum StashDisplayMode: String, CaseIterable, Identifiable {
+    case walletStack = "stack"
+    case grid = "grid"
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .walletStack: return "Pile Wallet"
+        case .grid: return "Grille"
+        }
+    }
+}
+
 /// Écran principal : la liste de toutes les cartes.
 struct CardListView: View {
     @EnvironmentObject private var store: CardStore
@@ -9,24 +22,48 @@ struct CardListView: View {
     @State private var editingCard: Card?
     @State private var searchText = ""
     @State private var showingSettings = false
+    @State private var selectedCardForDetail: Card?
     /// Carte mise en avant à l'accueil juste après son ajout.
     @State private var highlightedID: UUID?
 
+    @AppStorage("stash_display_mode") private var displayModeRaw = StashDisplayMode.walletStack.rawValue
+    @AppStorage("card_sort_option") private var sortOptionRaw = CardSortOption.manual.rawValue
+    @AppStorage("pin_favorites") private var pinFavorites = true
+    @State private var filterOption: CardFilterOption = .all
+
     private var filteredCards: [Card] {
-        guard !searchText.isEmpty else { return store.cards }
-        let query = searchText.lowercased()
-        return store.cards.filter {
-            $0.name.lowercased().contains(query) || $0.code.lowercased().contains(query)
-        }
+        let sortOption = CardSortOption(rawValue: sortOptionRaw) ?? .manual
+        return store.cards
+            .filtered(by: filterOption, query: searchText)
+            .sorted(by: sortOption, pinFavorites: pinFavorites)
     }
 
     var body: some View {
         NavigationStack {
-            Group {
-                if store.cards.isEmpty {
-                    emptyState
-                } else {
-                    cardGrid
+            VStack(spacing: 0) {
+                if !store.cards.isEmpty {
+                    filterBar
+                }
+
+                Group {
+                    if store.cards.isEmpty {
+                        emptyState
+                    } else if filteredCards.isEmpty {
+                        noResultsState
+                    } else if displayModeRaw == StashDisplayMode.walletStack.rawValue {
+                        WalletStackView(
+                            cards: filteredCards,
+                            onOpenDetail: { card in
+                                selectedCardForDetail = card
+                            },
+                            onEditCard: { card in
+                                editingCard = card
+                                showingForm = true
+                            }
+                        )
+                    } else {
+                        cardGrid
+                    }
                 }
             }
             .navigationTitle("Stash")
@@ -40,7 +77,39 @@ struct CardListView: View {
                     }
                     .glassButtonIfAvailable()
                 }
-                ToolbarItem(placement: .primaryAction) {
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button {
+                        Haptics.selection()
+                        withAnimation(Motion.snappy) {
+                            displayModeRaw = (displayModeRaw == StashDisplayMode.walletStack.rawValue)
+                                ? StashDisplayMode.grid.rawValue
+                                : StashDisplayMode.walletStack.rawValue
+                        }
+                    } label: {
+                        Image(systemName: displayModeRaw == StashDisplayMode.walletStack.rawValue ? "square.grid.2x2" : "square.stack.3d.up.fill")
+                    }
+                    .accessibilityLabel(displayModeRaw == StashDisplayMode.walletStack.rawValue ? "Afficher en grille" : "Afficher en pile Wallet")
+                    .glassButtonIfAvailable()
+
+                    Menu {
+                        Section("Trier par") {
+                            Picker("Tri", selection: $sortOptionRaw) {
+                                ForEach(CardSortOption.allCases) { option in
+                                    Label(option.label, systemImage: option.icon).tag(option.rawValue)
+                                }
+                            }
+                        }
+                        Section {
+                            Toggle(isOn: $pinFavorites) {
+                                Label("Épingler les favoris", systemImage: "star.fill")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
+                    .glassButtonIfAvailable()
+
                     Button {
                         Haptics.medium()
                         showingTypePicker = true
@@ -51,6 +120,21 @@ struct CardListView: View {
                 }
             }
             .searchable(text: $searchText, prompt: "Rechercher une carte")
+            .navigationDestination(item: $selectedCardForDetail) { card in
+                CardDetailView(card: card)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .stashOpenCard)) { notif in
+                if let id = notif.userInfo?["cardID"] as? UUID,
+                   let card = store.cards.first(where: { $0.id == id }) {
+                    selectedCardForDetail = card
+                }
+            }
+            .onAppear {
+                SpotlightService.updateIndex(with: store.cards)
+            }
+            .onChange(of: store.cards) { _, newCards in
+                SpotlightService.updateIndex(with: newCards)
+            }
             .sheet(isPresented: $showingForm) {
                 CardFormView(card: editingCard)
                     .environmentObject(store)
@@ -64,6 +148,58 @@ struct CardListView: View {
                     .environmentObject(store)
             }
         }
+    }
+
+    private var filterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(CardFilterOption.allCases) { filter in
+                    Button {
+                        Haptics.selection()
+                        withAnimation(Motion.snappy) {
+                            filterOption = filter
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: filter.icon)
+                                .font(.caption2)
+                            Text(filter.label)
+                                .font(.caption.weight(filterOption == filter ? .semibold : .medium))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(
+                            filterOption == filter ? Color.stashRed : Color.secondary.opacity(0.15),
+                            in: Capsule()
+                        )
+                        .foregroundStyle(filterOption == filter ? Color.white : Color.primary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+        }
+    }
+
+    private var noResultsState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 40))
+                .foregroundStyle(.secondary)
+            Text("Aucune carte trouvée")
+                .font(.headline)
+            Text("Essaie de modifier ta recherche ou le filtre actif.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(32)
+    }
+
+    private var canReorder: Bool {
+        searchText.isEmpty && filterOption == .all && sortOptionRaw == CardSortOption.manual.rawValue
     }
 
     private var cardGrid: some View {
@@ -88,9 +224,23 @@ struct CardListView: View {
                     .listRowBackground(Color.clear)
                     .appearInCascade(index: index)
                     .transition(.cardAppear)
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        Button {
+                            Haptics.light()
+                            withAnimation(Motion.snappy) {
+                                store.toggleFavorite(card)
+                            }
+                        } label: {
+                            Label(
+                                card.isFavorite ? "Défavoriser" : "Favori",
+                                systemImage: card.isFavorite ? "star.slash.fill" : "star.fill"
+                            )
+                        }
+                        .tint(.yellow)
+                    }
                 }
-                .onMove(perform: searchText.isEmpty ? move : nil)
-                .onDelete(perform: searchText.isEmpty ? deleteCards : nil)
+                .onMove(perform: canReorder ? move : nil)
+                .onDelete(perform: deleteCards)
             }
             .listStyle(.plain)
             .animation(Motion.standard, value: filteredCards.map(\.id))
@@ -128,11 +278,12 @@ struct CardListView: View {
 
     /// Supprime les cartes correspondant aux positions de la liste filtrée.
     private func deleteCards(at offsets: IndexSet) {
-        let ids = offsets.map { filteredCards[$0].id }
-        let storeOffsets = IndexSet(store.cards.enumerated().compactMap { ids.contains($0.element.id) ? $0.offset : nil })
+        let toDelete = offsets.map { filteredCards[$0] }
         Haptics.rigid()
         withAnimation(Motion.standard) {
-            store.delete(at: storeOffsets)
+            for card in toDelete {
+                store.delete(card)
+            }
         }
     }
 
@@ -226,7 +377,7 @@ struct CardTileView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(spacing: 8) {
                 if card.kind == .bank {
                     // Puce EMV miniature, pour évoquer la carte physique.
                     miniChip
@@ -234,6 +385,16 @@ struct CardTileView: View {
                     Image(systemName: card.kind == .other ? "rectangle.stack.fill" : "barcode")
                         .foregroundStyle(.white.opacity(0.9))
                 }
+
+                if card.isFavorite {
+                    Image(systemName: "star.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.yellow)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(.black.opacity(0.35), in: Capsule())
+                }
+
                 Spacer()
                 // Logo réseau (Visa/Mastercard/…) figé à la saisie, sinon le
                 // libellé du type de carte.
@@ -274,7 +435,18 @@ struct CardTileView: View {
         .frame(height: 130)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
-            if let backgroundArt {
+            if let design = CardDesign.find(card.designID) {
+                design.image
+                    .resizable()
+                    .scaledToFill()
+                    .overlay(
+                        LinearGradient(
+                            colors: [.black.opacity(0.12), .black.opacity(0.55)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            } else if let backgroundArt {
                 Image(uiImage: backgroundArt)
                     .resizable()
                     .scaledToFill()

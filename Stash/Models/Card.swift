@@ -19,12 +19,16 @@ enum CardKind: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-/// Format de code affiché pour une carte de fidélité.
+/// Format de code affiché pour une carte de fidélité ou d'accès.
 enum BarcodeFormat: String, Codable, CaseIterable, Identifiable {
     case auto
     case code128
     case ean13
+    case ean8
+    case upca
     case qr
+    case pdf417
+    case aztec
 
     var id: String { rawValue }
 
@@ -33,7 +37,11 @@ enum BarcodeFormat: String, Codable, CaseIterable, Identifiable {
         case .auto:    return "Automatique"
         case .code128: return "Code-barres (CODE128)"
         case .ean13:   return "Code-barres (EAN-13)"
+        case .ean8:    return "Code-barres (EAN-8)"
+        case .upca:    return "Code-barres (UPC-A)"
         case .qr:      return "QR Code"
+        case .pdf417:  return "PDF417 (Billets / Transport)"
+        case .aztec:   return "Aztec (Titres / Badges)"
         }
     }
 }
@@ -174,7 +182,7 @@ enum CardValidator {
 /// Modèle unique pour les deux types de cartes.
 /// Les champs sensibles (numéro de CB) ne sont JAMAIS stockés en clair :
 /// ils vivent dans le Keychain via `SecureVault`, indexés par `id`.
-struct Card: Identifiable, Codable, Equatable {
+struct Card: Identifiable, Codable, Equatable, Hashable {
     var id: UUID
     var kind: CardKind
     var name: String
@@ -213,6 +221,15 @@ struct Card: Identifiable, Codable, Equatable {
     var note: String                 // note libre de l'utilisateur
     var createdAt: Date              // date d'ajout
 
+    /// Carte épinglée en favori (affichée en tête de liste et avec une étoile).
+    var isFavorite: Bool
+
+    /// Horodatage de dernière consultation ou utilisation de la carte.
+    var lastUsedAt: Date?
+
+    /// Identifiant du design de carte officiel intégré ("" si utilisation de la couleur/photo).
+    var designID: String
+
     /// L'utilisateur a-t-il associé une image de fond à cette carte ? Le fichier
     /// lui-même vit dans `ArtVault` (dossier Application Support), indexé par
     /// `id` ; on ne garde ici qu'un drapeau non sensible pour savoir s'il faut
@@ -235,7 +252,10 @@ struct Card: Identifiable, Codable, Equatable {
         bankColorHex: String = "",
         note: String = "",
         createdAt: Date = Date(),
-        hasCustomArt: Bool = false
+        hasCustomArt: Bool = false,
+        isFavorite: Bool = false,
+        lastUsedAt: Date? = nil,
+        designID: String = ""
     ) {
         self.id = id
         self.kind = kind
@@ -253,12 +273,15 @@ struct Card: Identifiable, Codable, Equatable {
         self.note = note
         self.createdAt = createdAt
         self.hasCustomArt = hasCustomArt
+        self.isFavorite = isFavorite
+        self.lastUsedAt = lastUsedAt
+        self.designID = designID
     }
 
     // Décodage tolérant : les cartes déjà enregistrées (avant l'ajout de
-    // `note`/`createdAt`) ne possèdent pas ces clés → valeurs par défaut.
+    // `note`/`createdAt`/`isFavorite`/`lastUsedAt`/`designID`) ne possèdent pas ces clés → valeurs par défaut.
     enum CodingKeys: String, CodingKey {
-        case id, kind, name, colorHex, code, format, holder, expiry, lastFour, networkRaw, manualNetworkRaw, bankName, bankColorHex, note, createdAt, hasCustomArt
+        case id, kind, name, colorHex, code, format, holder, expiry, lastFour, networkRaw, manualNetworkRaw, bankName, bankColorHex, note, createdAt, hasCustomArt, isFavorite, lastUsedAt, designID
     }
 
     init(from decoder: Decoder) throws {
@@ -279,6 +302,9 @@ struct Card: Identifiable, Codable, Equatable {
         note     = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         hasCustomArt = try c.decodeIfPresent(Bool.self, forKey: .hasCustomArt) ?? false
+        isFavorite = try c.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+        lastUsedAt = try c.decodeIfPresent(Date.self, forKey: .lastUsedAt)
+        designID = try c.decodeIfPresent(String.self, forKey: .designID) ?? ""
     }
 
     /// Réseau bancaire utilisé pour l'apparence. Priorité au choix MANUEL de

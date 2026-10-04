@@ -78,9 +78,21 @@ struct RealisticCardView: View {
                     )
                 )
                 .overlay {
-                    // Image de fond éventuelle, sous un voile sombre pour que
-                    // le texte, la puce et le logo restent lisibles.
-                    if let backgroundArt {
+                    // Design officiel intégré ou image personnalisée
+                    if let design = CardDesign.find(card.designID) {
+                        design.image
+                            .resizable()
+                            .scaledToFill()
+                            .overlay(
+                                LinearGradient(
+                                    colors: [.black.opacity(0.12), .black.opacity(0.55)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .allowsHitTesting(false)
+                    } else if let backgroundArt {
                         Image(uiImage: backgroundArt)
                             .resizable()
                             .scaledToFill()

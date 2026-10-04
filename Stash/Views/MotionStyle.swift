@@ -23,6 +23,9 @@ enum Motion {
     /// Ressort rebondissant : effets ludiques ponctuels (validation, succès).
     static let bouncy: Animation = .spring(response: 0.45, dampingFraction: 0.6)
 
+    /// Ressort interactif fluide, optimisé pour les piles de cartes Wallet.
+    static let spring: Animation = .spring(response: 0.38, dampingFraction: 0.8)
+
     /// Fondu simple, pour les changements d'opacité discrets.
     static let fade: Animation = .easeInOut(duration: 0.25)
 

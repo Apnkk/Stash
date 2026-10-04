@@ -45,9 +45,13 @@ struct CardFormView: View {
     @State private var artPreview: UIImage?
     /// Intention à appliquer au moment de l'enregistrement.
     @State private var artChange: CardStore.ArtChange = .unchanged
+    @State private var designID = ""
+    @State private var showingDesignPicker = false
 
     @State private var showDeleteConfirm = false
     @State private var saveError: String?
+    @State private var showingScanner = false
+    @State private var scannerMode: ScannerMode = .barcode
 
     /// Non-nil après un enregistrement réussi : déclenche l'écran de succès.
     /// Contient le nom de la carte à afficher dans la célébration.
@@ -117,6 +121,7 @@ struct CardFormView: View {
             }
             c.manualNetworkRaw = manualNetwork == .unknown ? "" : manualNetwork.rawValue
         }
+        c.designID = designID
         return c
     }
 
@@ -221,6 +226,22 @@ struct CardFormView: View {
             }
         }
         .animation(Motion.standard, value: savedCardName != nil)
+        .sheet(isPresented: $showingScanner) {
+            ScannerView(
+                mode: scannerMode,
+                onBarcodeScanned: { payload, scannedFormat in
+                    self.code = payload
+                    self.format = scannedFormat
+                },
+                onBankCardScanned: { number, exp in
+                    self.fullNumber = number
+                    if let exp { self.expiry = exp }
+                }
+            )
+        }
+        .sheet(isPresented: $showingDesignPicker) {
+            DesignPickerView(selectedDesignID: $designID)
+        }
     }
 
     /// Aperçu en direct : mini-carte bancaire réaliste, ou tuile pour les autres
@@ -248,9 +269,24 @@ struct CardFormView: View {
 
     private var loyaltySection: some View {
         Section {
-            TextField(kind == .other ? "Numéro / code (facultatif)" : "Numéro / code", text: $code)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
+            HStack {
+                TextField(kind == .other ? "Numéro / code (facultatif)" : "Numéro / code", text: $code)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+
+                Button {
+                    Haptics.light()
+                    scannerMode = .barcode
+                    showingScanner = true
+                } label: {
+                    Image(systemName: "barcode.viewfinder")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Color.stashRed)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Scanner le code-barres")
+            }
+
             Picker("Type de code", selection: $format) {
                 ForEach(BarcodeFormat.allCases) { Text($0.label).tag($0) }
             }
@@ -278,6 +314,18 @@ struct CardFormView: View {
                         .background(.secondary.opacity(0.15), in: Capsule())
                         .accessibilityLabel("Réseau détecté : \(detectedNetwork.label)")
                 }
+
+                Button {
+                    Haptics.light()
+                    scannerMode = .bankCard
+                    showingScanner = true
+                } label: {
+                    Image(systemName: "camera.viewfinder")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Color.stashRed)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Scanner la carte bancaire")
             }
             if !numberLooksValid {
                 Text("Numéro de carte invalide (vérifie les chiffres).")
@@ -355,53 +403,94 @@ struct CardFormView: View {
     /// choix via la photothèque, et bouton de retrait le cas échéant.
     @ViewBuilder
     private var artPickerRow: some View {
-        if let artPreview {
-            HStack(spacing: 12) {
-                Image(uiImage: artPreview)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 66, height: 42)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
-                    )
-                    .accessibilityLabel("Aperçu de l'image de fond")
-
-                Text("Image sélectionnée")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                Button(role: .destructive) {
-                    Haptics.light()
-                    withAnimation(Motion.snappy) {
-                        self.artPreview = nil
-                        self.artItem = nil
-                        self.artChange = .remove
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                Haptics.light()
+                showingDesignPicker = true
+            } label: {
+                HStack(spacing: 12) {
+                    if let design = CardDesign.find(designID) {
+                        design.image
+                            .resizable()
+                            .aspectRatio(1.585, contentMode: .fit)
+                            .frame(width: 44, height: 28)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(design.name)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                            Text("Design officiel Stash")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Image(systemName: "square.grid.2x2")
+                            .font(.system(size: 18))
+                            .foregroundStyle(Color.stashRed)
+                            .frame(width: 28, height: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Galerie de designs")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                            Text("17 styles intégrés (Centurion, Mat, Prisme...)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                } label: {
-                    Image(systemName: "trash")
+                    Spacer()
+                    Text(designID.isEmpty ? "Choisir" : "Changer")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Color.stashRed)
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("Retirer l'image de fond")
             }
-        }
+            .buttonStyle(.plain)
 
-        PhotosPicker(
-            selection: $artItem,
-            matching: .images,
-            photoLibrary: .shared()
-        ) {
-            Label(
-                artPreview == nil ? "Choisir une image" : "Changer l'image",
-                systemImage: "photo"
-            )
-        }
-        .onChange(of: artItem) { _, newItem in
-            guard let newItem else { return }
-            Task { await loadPickedArt(newItem) }
+            if let artPreview {
+                HStack(spacing: 12) {
+                    Image(uiImage: artPreview)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 44, height: 28)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                    Text("Photo personnelle")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Button(role: .destructive) {
+                        Haptics.light()
+                        withAnimation(Motion.snappy) {
+                            self.artPreview = nil
+                            self.artItem = nil
+                            self.artChange = .remove
+                        }
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Retirer la photo personnelle")
+                }
+            }
+
+            PhotosPicker(
+                selection: $artItem,
+                matching: .images,
+                photoLibrary: .shared()
+            ) {
+                Label(
+                    artPreview == nil ? "Importer depuis Photos" : "Remplacer ma photo",
+                    systemImage: "photo"
+                )
+            }
+            .onChange(of: artItem) { _, newItem in
+                guard let newItem else { return }
+                Task { await loadPickedArt(newItem) }
+            }
         }
     }
 
@@ -442,6 +531,7 @@ struct CardFormView: View {
         holder = card.holder
         expiry = card.expiry
         note = card.note
+        designID = card.designID
         // Choix de design manuel déjà enregistré ("" -> Automatique).
         manualNetwork = CardNetwork(rawValue: card.manualNetworkRaw) ?? .unknown
         // On ne pré-remplit jamais le numéro complet : il reste dans le Keychain.
@@ -474,6 +564,7 @@ struct CardFormView: View {
         updated.holder = holder.trimmingCharacters(in: .whitespaces)
         updated.expiry = expiry.trimmingCharacters(in: .whitespaces)
         updated.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        updated.designID = designID
 
         // Fige la marque (réseau + banque) tant que le numéro complet est en
         // clair ici. Ces champs ne sont PAS sensibles et évitent de relire le

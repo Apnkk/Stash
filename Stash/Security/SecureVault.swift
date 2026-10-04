@@ -38,12 +38,14 @@ enum SecureVault {
         }
     }
 
-    /// Construit le contrôle d'accès biométrique partagé par save/read.
+    /// Construit le contrôle d'accès biométrique ou code d'accès partagé par save/read.
+    /// Utilise `.biometryCurrentSet` avec repli `.devicePasscode` pour ne jamais
+    /// perdre définitivement les données si Face ID est reconfiguré.
     private static func makeAccessControl() -> SecAccessControl? {
         SecAccessControlCreateWithFlags(
             nil,
             kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-            .biometryCurrentSet,
+            [.biometryCurrentSet, .or, .devicePasscode],
             nil
         )
     }
@@ -77,16 +79,19 @@ enum SecureVault {
         return true
     }
 
-    /// Lit un secret. Déclenche le prompt biométrique du Keychain.
+    /// Lit un secret. Déclenche le prompt biométrique / code du Keychain.
     /// - Parameter prompt: message affiché dans la boîte de dialogue système.
     static func read(_ key: String, prompt: String) throws -> String {
-        // `kSecUseOperationPrompt` est déprécié : on passe le message via un
-        // `LAContext.localizedReason`, transmis au Keychain par
-        // `kSecUseAuthenticationContext`. Le prompt biométrique reste piloté
-        // par le `SecAccessControl` (.biometryCurrentSet) posé à l'écriture.
         let context = LAContext()
         context.localizedReason = prompt
+        let val = try read(key, context: context)
+        // Migration transparente vers la nouvelle politique de contrôle d'accès
+        _ = try? save(val, for: key)
+        return val
+    }
 
+    /// Lit un secret en réutilisant un LAContext déjà authentifié.
+    static func read(_ key: String, context: LAContext) throws -> String {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -115,6 +120,18 @@ enum SecureVault {
         default:
             throw VaultError.keychainFailed(status)
         }
+    }
+
+    /// Lit une collection de secrets avec un seul contexte d'authentification partagé.
+    static func readAll(keys: [String], context: LAContext = LAContext()) throws -> [String: String] {
+        var results: [String: String] = [:]
+        for key in keys {
+            if let val = try? read(key, context: context) {
+                results[key] = val
+                _ = try? save(val, for: key)
+            }
+        }
+        return results
     }
 
     /// Liste toutes les clés (comptes) actuellement stockées dans ce service.

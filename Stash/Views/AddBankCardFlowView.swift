@@ -50,8 +50,11 @@ struct AddBankCardFlowView: View {
     @State private var name = ""
     @State private var colorHex = Palette.colors[0]
     @State private var manualNetwork: CardNetwork = .unknown
+    @State private var designID = ""
+    @State private var showingDesignPicker = false
 
     @State private var saveError: String?
+    @State private var showingScanner = false
     /// Non-nil après un enregistrement réussi : déclenche l'écran de succès.
     @State private var savedCardName: String?
 
@@ -143,6 +146,7 @@ struct AddBankCardFlowView: View {
             c.bankColorHex = brand.brandColors?.first ?? ""
         }
         c.manualNetworkRaw = manualNetwork == .unknown ? "" : manualNetwork.rawValue
+        c.designID = designID
         return c
     }
 
@@ -219,6 +223,18 @@ struct AddBankCardFlowView: View {
             }
         }
         .animation(Motion.standard, value: savedCardName != nil)
+        .sheet(isPresented: $showingScanner) {
+            ScannerView(
+                mode: .bankCard,
+                onBankCardScanned: { number, exp in
+                    self.fullNumber = formatCardNumber(number)
+                    if let exp { self.expiry = exp }
+                }
+            )
+        }
+        .sheet(isPresented: $showingDesignPicker) {
+            DesignPickerView(selectedDesignID: $designID)
+        }
     }
 
     // MARK: - Barre de progression
@@ -288,9 +304,33 @@ struct AddBankCardFlowView: View {
                         .transition(.popIn)
                         .accessibilityLabel("Réseau détecté : \(detectedNetwork.label)")
                 }
+
+                Button {
+                    Haptics.light()
+                    showingScanner = true
+                } label: {
+                    Image(systemName: "camera.viewfinder")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Color.stashRed)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Scanner la carte bancaire")
             }
             .padding(14)
             .glassPanel(cornerRadius: 14)
+
+            Button {
+                Haptics.light()
+                showingScanner = true
+            } label: {
+                Label("Scanner ma carte", systemImage: "camera.viewfinder")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.stashRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(Color.stashRed)
+            }
+            .buttonStyle(.plain)
 
             if !numberDigits.isEmpty && !numberIsValid {
                 Text("Numéro incomplet ou invalide (vérifie les chiffres).")
@@ -371,7 +411,60 @@ struct AddBankCardFlowView: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("Couleur")
+                Text("Visuel de la carte")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Button {
+                    Haptics.light()
+                    showingDesignPicker = true
+                } label: {
+                    HStack(spacing: 12) {
+                        if let design = CardDesign.find(designID) {
+                            design.image
+                                .resizable()
+                                .aspectRatio(1.585, contentMode: .fit)
+                                .frame(width: 44, height: 28)
+                                .clipShape(RoundedRectangle(cornerRadius: 5))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(design.name)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                Text("Design officiel Stash")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else {
+                            Circle()
+                                .fill(Color(hex: colorHex))
+                                .frame(width: 28, height: 28)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Couleur unie")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                Text("Choisir parmi les 17 designs intégrés")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        Spacer()
+
+                        Text("Changer")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(Color.stashRed)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(14)
+                    .glassPanel(cornerRadius: 14)
+                }
+                .buttonStyle(.plain)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Couleur de secours")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
                 colorPicker
@@ -565,6 +658,7 @@ struct AddBankCardFlowView: View {
         card.bankName = brand.bankName ?? ""
         card.bankColorHex = brand.brandColors?.first ?? ""
         card.manualNetworkRaw = manualNetwork == .unknown ? "" : manualNetwork.rawValue
+        card.designID = designID
 
         do {
             try store.upsert(card, fullNumber: fullNumber)

@@ -20,6 +20,7 @@ struct CardDetailView: View {
     @State private var codeCopied = false
     @State private var shareImage: UIImage?
     @State private var showingShare = false
+    @State private var showingPresentationMode = false
     @State private var isCaptured = CardDetailView.activeScreen.isCaptured
 
     /// Image du code-barres / QR, générée une seule fois par carte (CoreImage
@@ -56,7 +57,7 @@ struct CardDetailView: View {
                 // La carte fidélité garde un bandeau titre ; la carte bancaire
                 // affiche sa propre carte réaliste (RealisticCardView) et n'a
                 // donc pas besoin du header.
-                if card.kind != .bank {
+                if currentCard.kind != .bank {
                     header
                     loyaltyContent
                 } else {
@@ -69,10 +70,29 @@ struct CardDetailView: View {
             }
             .padding(20)
         }
-        .navigationTitle(card.name)
+        .navigationTitle(currentCard.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                if currentCard.kind != .bank {
+                    Button {
+                        Haptics.medium()
+                        showingPresentationMode = true
+                    } label: {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    }
+                    .accessibilityLabel("Mode présentation caisse plein écran")
+                }
+
+                Button {
+                    Haptics.light()
+                    store.toggleFavorite(currentCard)
+                } label: {
+                    Image(systemName: currentCard.isFavorite ? "star.fill" : "star")
+                        .foregroundStyle(currentCard.isFavorite ? .yellow : .primary)
+                }
+                .accessibilityLabel(currentCard.isFavorite ? "Retirer des favoris" : "Ajouter aux favoris")
+
                 Button("Modifier") { showingEdit = true }
             }
         }
@@ -85,11 +105,16 @@ struct CardDetailView: View {
                 ShareSheet(items: [image])
             }
         }
+        .fullScreenCover(isPresented: $showingPresentationMode) {
+            PresentationModeView(card: currentCard, barcodeImage: barcodeImage)
+        }
         .onAppear {
+            store.markUsed(currentCard)
             if card.kind != .bank {
                 let screen = Self.activeScreen
                 previousBrightness = screen.brightness
                 screen.brightness = 1.0
+                UIApplication.shared.isIdleTimerDisabled = true
                 regenerateBarcodeIfNeeded()
             }
         }
@@ -103,6 +128,7 @@ struct CardDetailView: View {
         .onDisappear {
             if card.kind != .bank {
                 Self.activeScreen.brightness = previousBrightness
+                UIApplication.shared.isIdleTimerDisabled = false
             }
             autoHideTask?.cancel()
         }
@@ -130,6 +156,11 @@ struct CardDetailView: View {
             isCaptured = Self.activeScreen.isCaptured
             if isCaptured, revealedNumber != nil { hide() }
         }
+        .onChange(of: store.cards) { _, newCards in
+            if !newCards.contains(where: { $0.id == card.id }) {
+                dismiss()
+            }
+        }
     }
 
     /// Renvoie la version à jour de la carte depuis le store (après édition).
@@ -141,13 +172,13 @@ struct CardDetailView: View {
         RoundedRectangle(cornerRadius: 20, style: .continuous)
             .fill(
                 LinearGradient(
-                    colors: [Color(hex: card.colorHex), Color(hex: card.colorHex).opacity(0.75)],
+                    colors: [Color(hex: currentCard.colorHex), Color(hex: currentCard.colorHex).opacity(0.75)],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 )
             )
             .frame(height: 90)
             .overlay(
-                Text(card.name)
+                Text(currentCard.name)
                     .font(.title3.weight(.bold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 20),
@@ -160,20 +191,35 @@ struct CardDetailView: View {
     private var loyaltyContent: some View {
         VStack(spacing: 16) {
             if let image = barcodeImage {
-                Image(uiImage: image)
-                    .interpolation(.none)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 220)
-                    .padding(24)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay {
-                        if #available(iOS 26, *) {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .strokeBorder(.white.opacity(0.4), lineWidth: 1)
-                        }
+                Button {
+                    Haptics.medium()
+                    showingPresentationMode = true
+                } label: {
+                    ZStack(alignment: .topTrailing) {
+                        Image(uiImage: image)
+                            .interpolation(.none)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 220)
+                            .padding(24)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .overlay {
+                                if #available(iOS 26, *) {
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .strokeBorder(.white.opacity(0.4), lineWidth: 1)
+                                }
+                            }
+
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.black.opacity(0.5))
+                            .padding(10)
                     }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Agrandir le code en mode caisse plein écran")
             } else {
                 Text("Impossible de générer le code pour cette valeur.")
                     .font(.footnote)
