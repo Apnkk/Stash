@@ -70,6 +70,7 @@ final class CardStore: ObservableObject {
             let data = try JSONEncoder().encode(cards)
             try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
             persistenceError = nil
+            AutoBackupService.performAutoBackup(cards: cards)
         } catch {
             persistenceError = "Échec de l'enregistrement : \(error.localizedDescription)"
         }
@@ -237,9 +238,36 @@ final class CardStore: ObservableObject {
             _ = try? SecureVault.delete(key)
         }
         // Même logique pour les images de fond orphelines (import/suppression).
-        for key in ArtVault.allKeys() where !liveIDs.contains(key) {
-            ArtVault.delete(key)
+    }
+
+    // MARK: - Sauvegarde complète chiffrée par mot de passe (.stashbackup)
+
+    /// Exporte une archive chiffrée par mot de passe contenant les cartes et les secrets Keychain.
+    func exportEncryptedBackup(password: String) throws -> Data {
+        let bankCardKeys = cards.filter { $0.kind == .bank }.map { $0.id.uuidString }
+        let secrets = SecureVault.readAll(keys: bankCardKeys)
+        return try BackupService.exportEncryptedBackup(cards: cards, secrets: secrets, password: password)
+    }
+
+    /// Restaure une archive chiffrée par mot de passe et réinjecte les secrets dans le Keychain.
+    @discardableResult
+    func importEncryptedBackup(_ data: Data, password: String) throws -> Int {
+        let payload = try BackupService.importEncryptedBackup(archiveData: data, password: password)
+
+        var accepted = 0
+        for card in payload.cards where isImportable(card) {
+            if let idx = cards.firstIndex(where: { $0.id == card.id }) {
+                cards[idx] = card
+            } else {
+                cards.append(card)
+            }
+            if let secret = payload.secrets[card.id.uuidString], !secret.isEmpty {
+                _ = try? SecureVault.save(secret, for: card.id.uuidString)
+            }
+            accepted += 1
         }
+        persist()
+        return accepted
     }
 
     /// Contrôle de cohérence minimal d'une carte reçue par import, pour ne pas
