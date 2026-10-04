@@ -3,6 +3,7 @@ import Foundation
 @testable import Stash
 
 @Suite("Tests de persistance et résilience de CardStore")
+@MainActor
 struct CardStoreTests {
 
     private func createTempStore() -> (CardStore, URL) {
