@@ -36,6 +36,19 @@ workflows:
             "Stash/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"
           ls -lh "Stash/Assets.xcassets/AppIcon.appiconset/"
 
+      - name: Run unit tests
+        script: |
+          set -euo pipefail
+          SIM_ID=$(xcrun simctl list devices available -j | jq -r '.devices[] | select(type=="array") | .[] | select(.name | contains("iPhone")) | .udid' | head -1)
+          if [ -n "$SIM_ID" ]; then
+            echo "Tests sur simulateur $SIM_ID"
+            xcodebuild test \
+              -project Stash.xcodeproj \
+              -scheme "$SCHEME" \
+              -destination "platform=iOS Simulator,id=$SIM_ID" \
+              -derivedDataPath "$CM_BUILD_DIR/build/DerivedData"
+          fi
+
       - name: Build (no signing)
         script: |
           set -euo pipefail
