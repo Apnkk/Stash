@@ -57,4 +57,48 @@ struct BarcodeGeneratorTests {
         card.code = "123456789"
         #expect(BarcodeGenerator.image(for: card) != nil)
     }
+
+    @Test("Génération EAN-8 et UPC-A avec contrôle de clé")
+    func testEan8AndUpca() {
+        var card = Card(kind: .loyalty, name: "Test")
+
+        // EAN-8 valide
+        card.format = .ean8
+        card.code = "96385074"
+        #expect(BarcodeGenerator.image(for: card) != nil)
+
+        // EAN-8 7 chiffres (complété automatiquement)
+        card.code = "9638507"
+        #expect(BarcodeGenerator.image(for: card) != nil)
+
+        // EAN-8 clé invalide
+        card.code = "96385070"
+        #expect(BarcodeGenerator.image(for: card) == nil)
+
+        // UPC-A valide
+        card.format = .upca
+        card.code = "012345678905"
+        #expect(BarcodeGenerator.image(for: card) != nil)
+
+        // UPC-A 11 chiffres (complété automatiquement)
+        card.code = "01234567890"
+        #expect(BarcodeGenerator.image(for: card) != nil)
+
+        // UPC-A clé invalide
+        card.code = "012345678901"
+        #expect(BarcodeGenerator.image(for: card) == nil)
+    }
+
+    @Test("Génération PDF417 et Aztec")
+    func testPdf417AndAztec() {
+        var card = Card(kind: .loyalty, name: "Test")
+
+        card.format = .pdf417
+        card.code = "BOARDING-PASS-STASH-12345"
+        #expect(BarcodeGenerator.image(for: card) != nil)
+
+        card.format = .aztec
+        card.code = "AZTEC-STASH-TICKET"
+        #expect(BarcodeGenerator.image(for: card) != nil)
+    }
 }

@@ -36,6 +36,8 @@
     <true/>
     <key>NSFaceIDUsageDescription</key>
     <string>Stash utilise Face ID pour déverrouiller l'app et protéger tes cartes bancaires.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Stash utilise la caméra pour scanner les codes-barres et les numéros de carte. Vos données restent strictement sur votre appareil.</string>
     <key>UILaunchScreen</key>
     <dict/>
     <key>UIApplicationSceneManifest</key>

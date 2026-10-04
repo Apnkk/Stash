@@ -48,6 +48,8 @@ struct CardFormView: View {
 
     @State private var showDeleteConfirm = false
     @State private var saveError: String?
+    @State private var showingScanner = false
+    @State private var scannerMode: ScannerMode = .barcode
 
     /// Non-nil après un enregistrement réussi : déclenche l'écran de succès.
     /// Contient le nom de la carte à afficher dans la célébration.
@@ -221,6 +223,19 @@ struct CardFormView: View {
             }
         }
         .animation(Motion.standard, value: savedCardName != nil)
+        .sheet(isPresented: $showingScanner) {
+            ScannerView(
+                mode: scannerMode,
+                onBarcodeScanned: { payload, scannedFormat in
+                    self.code = payload
+                    self.format = scannedFormat
+                },
+                onBankCardScanned: { number, exp in
+                    self.fullNumber = number
+                    if let exp { self.expiry = exp }
+                }
+            )
+        }
     }
 
     /// Aperçu en direct : mini-carte bancaire réaliste, ou tuile pour les autres
@@ -248,9 +263,24 @@ struct CardFormView: View {
 
     private var loyaltySection: some View {
         Section {
-            TextField(kind == .other ? "Numéro / code (facultatif)" : "Numéro / code", text: $code)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
+            HStack {
+                TextField(kind == .other ? "Numéro / code (facultatif)" : "Numéro / code", text: $code)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+
+                Button {
+                    Haptics.light()
+                    scannerMode = .barcode
+                    showingScanner = true
+                } label: {
+                    Image(systemName: "barcode.viewfinder")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Color.stashRed)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Scanner le code-barres")
+            }
+
             Picker("Type de code", selection: $format) {
                 ForEach(BarcodeFormat.allCases) { Text($0.label).tag($0) }
             }
@@ -278,6 +308,18 @@ struct CardFormView: View {
                         .background(.secondary.opacity(0.15), in: Capsule())
                         .accessibilityLabel("Réseau détecté : \(detectedNetwork.label)")
                 }
+
+                Button {
+                    Haptics.light()
+                    scannerMode = .bankCard
+                    showingScanner = true
+                } label: {
+                    Image(systemName: "camera.viewfinder")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Color.stashRed)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Scanner la carte bancaire")
             }
             if !numberLooksValid {
                 Text("Numéro de carte invalide (vérifie les chiffres).")

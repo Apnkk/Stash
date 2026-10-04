@@ -19,12 +19,16 @@ enum CardKind: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-/// Format de code affiché pour une carte de fidélité.
+/// Format de code affiché pour une carte de fidélité ou d'accès.
 enum BarcodeFormat: String, Codable, CaseIterable, Identifiable {
     case auto
     case code128
     case ean13
+    case ean8
+    case upca
     case qr
+    case pdf417
+    case aztec
 
     var id: String { rawValue }
 
@@ -33,7 +37,11 @@ enum BarcodeFormat: String, Codable, CaseIterable, Identifiable {
         case .auto:    return "Automatique"
         case .code128: return "Code-barres (CODE128)"
         case .ean13:   return "Code-barres (EAN-13)"
+        case .ean8:    return "Code-barres (EAN-8)"
+        case .upca:    return "Code-barres (UPC-A)"
         case .qr:      return "QR Code"
+        case .pdf417:  return "PDF417 (Billets / Transport)"
+        case .aztec:   return "Aztec (Titres / Badges)"
         }
     }
 }

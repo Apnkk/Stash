@@ -52,6 +52,7 @@ struct AddBankCardFlowView: View {
     @State private var manualNetwork: CardNetwork = .unknown
 
     @State private var saveError: String?
+    @State private var showingScanner = false
     /// Non-nil après un enregistrement réussi : déclenche l'écran de succès.
     @State private var savedCardName: String?
 
@@ -219,6 +220,15 @@ struct AddBankCardFlowView: View {
             }
         }
         .animation(Motion.standard, value: savedCardName != nil)
+        .sheet(isPresented: $showingScanner) {
+            ScannerView(
+                mode: .bankCard,
+                onBankCardScanned: { number, exp in
+                    self.fullNumber = formatCardNumber(number)
+                    if let exp { self.expiry = exp }
+                }
+            )
+        }
     }
 
     // MARK: - Barre de progression
@@ -288,9 +298,33 @@ struct AddBankCardFlowView: View {
                         .transition(.popIn)
                         .accessibilityLabel("Réseau détecté : \(detectedNetwork.label)")
                 }
+
+                Button {
+                    Haptics.light()
+                    showingScanner = true
+                } label: {
+                    Image(systemName: "camera.viewfinder")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Color.stashRed)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Scanner la carte bancaire")
             }
             .padding(14)
             .glassPanel(cornerRadius: 14)
+
+            Button {
+                Haptics.light()
+                showingScanner = true
+            } label: {
+                Label("Scanner ma carte", systemImage: "camera.viewfinder")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.stashRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(Color.stashRed)
+            }
+            .buttonStyle(.plain)
 
             if !numberDigits.isEmpty && !numberIsValid {
                 Text("Numéro incomplet ou invalide (vérifie les chiffres).")
