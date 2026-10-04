@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import UIKit
+import LocalAuthentication
 
 /// Source de vérité de l'app : la liste des cartes.
 ///
@@ -243,9 +244,9 @@ final class CardStore: ObservableObject {
     // MARK: - Sauvegarde complète chiffrée par mot de passe (.stashbackup)
 
     /// Exporte une archive chiffrée par mot de passe contenant les cartes et les secrets Keychain.
-    func exportEncryptedBackup(password: String) throws -> Data {
+    func exportEncryptedBackup(password: String, context: LAContext = LAContext()) throws -> Data {
         let bankCardKeys = cards.filter { $0.kind == .bank }.map { $0.id.uuidString }
-        let secrets = SecureVault.readAll(keys: bankCardKeys)
+        let secrets = bankCardKeys.isEmpty ? [:] : ((try? SecureVault.readAll(keys: bankCardKeys, context: context)) ?? [:])
         return try BackupService.exportEncryptedBackup(cards: cards, secrets: secrets, password: password)
     }
 

@@ -123,7 +123,7 @@ enum SecureVault {
     }
 
     /// Lit une collection de secrets avec un seul contexte d'authentification partagé.
-    static func readAll(keys: [String], context: LAContext) throws -> [String: String] {
+    static func readAll(keys: [String], context: LAContext = LAContext()) throws -> [String: String] {
         var results: [String: String] = [:]
         for key in keys {
             if let val = try? read(key, context: context) {
