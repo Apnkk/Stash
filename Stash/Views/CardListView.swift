@@ -1,5 +1,18 @@
 import SwiftUI
 
+enum StashDisplayMode: String, CaseIterable, Identifiable {
+    case walletStack = "stack"
+    case grid = "grid"
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .walletStack: return "Pile Wallet"
+        case .grid: return "Grille"
+        }
+    }
+}
+
 /// Écran principal : la liste de toutes les cartes.
 struct CardListView: View {
     @EnvironmentObject private var store: CardStore
@@ -9,9 +22,11 @@ struct CardListView: View {
     @State private var editingCard: Card?
     @State private var searchText = ""
     @State private var showingSettings = false
+    @State private var selectedCardForDetail: Card?
     /// Carte mise en avant à l'accueil juste après son ajout.
     @State private var highlightedID: UUID?
 
+    @AppStorage("stash_display_mode") private var displayModeRaw = StashDisplayMode.walletStack.rawValue
     @AppStorage("card_sort_option") private var sortOptionRaw = CardSortOption.manual.rawValue
     @AppStorage("pin_favorites") private var pinFavorites = true
     @State private var filterOption: CardFilterOption = .all
@@ -35,6 +50,17 @@ struct CardListView: View {
                         emptyState
                     } else if filteredCards.isEmpty {
                         noResultsState
+                    } else if displayModeRaw == StashDisplayMode.walletStack.rawValue {
+                        WalletStackView(
+                            cards: filteredCards,
+                            onOpenDetail: { card in
+                                selectedCardForDetail = card
+                            },
+                            onEditCard: { card in
+                                editingCard = card
+                                showingForm = true
+                            }
+                        )
                     } else {
                         cardGrid
                     }
@@ -53,6 +79,19 @@ struct CardListView: View {
                 }
 
                 ToolbarItemGroup(placement: .primaryAction) {
+                    Button {
+                        Haptics.selection()
+                        withAnimation(Motion.snappy) {
+                            displayModeRaw = (displayModeRaw == StashDisplayMode.walletStack.rawValue)
+                                ? StashDisplayMode.grid.rawValue
+                                : StashDisplayMode.walletStack.rawValue
+                        }
+                    } label: {
+                        Image(systemName: displayModeRaw == StashDisplayMode.walletStack.rawValue ? "square.grid.2x2" : "square.stack.3d.up.fill")
+                    }
+                    .accessibilityLabel(displayModeRaw == StashDisplayMode.walletStack.rawValue ? "Afficher en grille" : "Afficher en pile Wallet")
+                    .glassButtonIfAvailable()
+
                     Menu {
                         Section("Trier par") {
                             Picker("Tri", selection: $sortOptionRaw) {
@@ -81,6 +120,21 @@ struct CardListView: View {
                 }
             }
             .searchable(text: $searchText, prompt: "Rechercher une carte")
+            .navigationDestination(item: $selectedCardForDetail) { card in
+                CardDetailView(card: card)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .stashOpenCard)) { notif in
+                if let id = notif.userInfo?["cardID"] as? UUID,
+                   let card = store.cards.first(where: { $0.id == id }) {
+                    selectedCardForDetail = card
+                }
+            }
+            .onAppear {
+                SpotlightService.updateIndex(with: store.cards)
+            }
+            .onChange(of: store.cards) { _, newCards in
+                SpotlightService.updateIndex(with: newCards)
+            }
             .sheet(isPresented: $showingForm) {
                 CardFormView(card: editingCard)
                     .environmentObject(store)

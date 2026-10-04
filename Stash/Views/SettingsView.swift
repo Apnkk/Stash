@@ -14,6 +14,8 @@ struct SettingsView: View {
 
     @AppStorage(AutoLockDelay.storageKey) private var autoLockRaw = AutoLockDelay.thirtySeconds.rawValue
     @AppStorage(ExpiryReminderService.settingsKey) private var expiryRemindersEnabled = false
+    @AppStorage("stash_display_mode") private var displayModeRaw = StashDisplayMode.walletStack.rawValue
+    @AppStorage(SpotlightService.settingsKey) private var spotlightEnabled = false
 
     // Sauvegarde chiffrée
     @State private var showingExportPasswordSheet = false
@@ -35,6 +37,19 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // MARK: Présentation
+                Section {
+                    Picker("Affichage des cartes", selection: $displayModeRaw) {
+                        ForEach(StashDisplayMode.allCases) { mode in
+                            Text(mode.label).tag(mode.rawValue)
+                        }
+                    }
+                } header: {
+                    Text("Présentation")
+                } footer: {
+                    Text("La pile Wallet présente vos cartes superposées façon Apple Wallet. La grille les affiche sous forme de liste fluide.")
+                }
+
                 // MARK: Sécurité
                 Section {
                     Picker("Verrouillage auto", selection: $autoLockRaw) {
@@ -46,6 +61,18 @@ struct SettingsView: View {
                     Text("Sécurité")
                 } footer: {
                     Text("Délai avant que Stash ne redemande Face ID / Touch ID après être passé en arrière-plan. « Immédiat » reverrouille dès que tu quittes l'app.")
+                }
+
+                // MARK: Spotlight
+                Section {
+                    Toggle("Recherche Spotlight (fidélité)", isOn: $spotlightEnabled)
+                        .onChange(of: spotlightEnabled) { _, _ in
+                            SpotlightService.updateIndex(with: store.cards)
+                        }
+                } header: {
+                    Text("Recherche système")
+                } footer: {
+                    Text("Permet de retrouver directement tes cartes de fidélité depuis Spotlight. 🔒 Les cartes bancaires sont strictement exclues pour garantir ta confidentialité.")
                 }
 
                 // MARK: Notifications

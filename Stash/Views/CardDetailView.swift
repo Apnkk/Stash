@@ -20,6 +20,7 @@ struct CardDetailView: View {
     @State private var codeCopied = false
     @State private var shareImage: UIImage?
     @State private var showingShare = false
+    @State private var showingPresentationMode = false
     @State private var isCaptured = CardDetailView.activeScreen.isCaptured
 
     /// Image du code-barres / QR, générée une seule fois par carte (CoreImage
@@ -73,6 +74,16 @@ struct CardDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                if currentCard.kind != .bank {
+                    Button {
+                        Haptics.medium()
+                        showingPresentationMode = true
+                    } label: {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    }
+                    .accessibilityLabel("Mode présentation caisse plein écran")
+                }
+
                 Button {
                     Haptics.light()
                     store.toggleFavorite(currentCard)
@@ -94,12 +105,16 @@ struct CardDetailView: View {
                 ShareSheet(items: [image])
             }
         }
+        .fullScreenCover(isPresented: $showingPresentationMode) {
+            PresentationModeView(card: currentCard, barcodeImage: barcodeImage)
+        }
         .onAppear {
             store.markUsed(currentCard)
             if card.kind != .bank {
                 let screen = Self.activeScreen
                 previousBrightness = screen.brightness
                 screen.brightness = 1.0
+                UIApplication.shared.isIdleTimerDisabled = true
                 regenerateBarcodeIfNeeded()
             }
         }
@@ -113,6 +128,7 @@ struct CardDetailView: View {
         .onDisappear {
             if card.kind != .bank {
                 Self.activeScreen.brightness = previousBrightness
+                UIApplication.shared.isIdleTimerDisabled = false
             }
             autoHideTask?.cancel()
         }
@@ -175,20 +191,35 @@ struct CardDetailView: View {
     private var loyaltyContent: some View {
         VStack(spacing: 16) {
             if let image = barcodeImage {
-                Image(uiImage: image)
-                    .interpolation(.none)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 220)
-                    .padding(24)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay {
-                        if #available(iOS 26, *) {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .strokeBorder(.white.opacity(0.4), lineWidth: 1)
-                        }
+                Button {
+                    Haptics.medium()
+                    showingPresentationMode = true
+                } label: {
+                    ZStack(alignment: .topTrailing) {
+                        Image(uiImage: image)
+                            .interpolation(.none)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 220)
+                            .padding(24)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .overlay {
+                                if #available(iOS 26, *) {
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .strokeBorder(.white.opacity(0.4), lineWidth: 1)
+                                }
+                            }
+
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.black.opacity(0.5))
+                            .padding(10)
                     }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Agrandir le code en mode caisse plein écran")
             } else {
                 Text("Impossible de générer le code pour cette valeur.")
                     .font(.footnote)
