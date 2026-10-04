@@ -41,18 +41,10 @@ jobs:
       - name: Run unit tests
         run: |
           set -euo pipefail
-          # Trouve ou prépare un simulateur iPhone disponible
-          SIM_ID=$(xcrun simctl list devices available -j | jq -r '.devices[] | select(type=="array") | .[] | select(.name | contains("iPhone")) | .udid' | head -1)
-          if [ -z "$SIM_ID" ]; then
-            echo "Création d'un simulateur de test..."
-            RUNTIME=$(xcrun simctl list runtimes -j | jq -r '.runtimes[] | select(.name | contains("iOS")) | .identifier' | head -1)
-            SIM_ID=$(xcrun simctl create "Test-iPhone" "com.apple.CoreSimulator.SimDeviceType.iPhone-16" "$RUNTIME")
-          fi
-          echo "Exécution des tests sur le simulateur $SIM_ID"
           xcodebuild test \
             -project Stash.xcodeproj \
             -scheme "$SCHEME" \
-            -destination "platform=iOS Simulator,id=$SIM_ID" \
+            -destination "platform=iOS Simulator,name=iPhone 16 Pro" \
             -derivedDataPath "$DERIVED_DATA"
 
       - name: Build (no signing)
