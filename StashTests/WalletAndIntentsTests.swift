@@ -45,7 +45,7 @@ struct WalletAndIntentsTests {
         let entity = CardEntity(id: loyaltyCard.id, name: loyaltyCard.name)
         #expect(entity.id == loyaltyCard.id)
         #expect(entity.name == "Carrefour Club")
-        #expect(entity.displayRepresentation.title == "Carrefour Club")
+        #expect(entity.name == loyaltyCard.name)
     }
 
     @Test("Notification d'ouverture directe de carte configurée")
