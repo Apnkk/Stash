@@ -98,15 +98,19 @@ struct DesignPickerView: View {
                             selectedCategory = cat
                         }
                     } label: {
-                        Text(cat.label)
-                            .font(.caption.weight(selectedCategory == cat ? .semibold : .medium))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(
-                                selectedCategory == cat ? Color.stashRed : Color.secondary.opacity(0.15),
-                                in: Capsule()
-                            )
-                            .foregroundStyle(selectedCategory == cat ? Color.white : Color.primary)
+                        HStack(spacing: 5) {
+                            Image(systemName: cat.icon)
+                                .font(.caption2)
+                            Text(cat.label)
+                                .font(.caption.weight(selectedCategory == cat ? .semibold : .medium))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(
+                            selectedCategory == cat ? Color.stashRed : Color.secondary.opacity(0.15),
+                            in: Capsule()
+                        )
+                        .foregroundStyle(selectedCategory == cat ? Color.white : Color.primary)
                     }
                     .buttonStyle(.plain)
                 }

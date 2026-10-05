@@ -1,11 +1,8 @@
 import SwiftUI
 
-/// Rendu d'une carte bancaire physique réaliste : dégradé, puce EMV,
-/// logo du réseau, numéro formaté par blocs, titulaire et expiration.
-///
-/// Le numéro complet n'est affiché que si `revealedNumber` est fourni
-/// (après authentification côté vue de détail) ; sinon on masque tout
-/// sauf les quatre derniers chiffres.
+/// Rendu physique haut de gamme d'une carte bancaire : dégradé titane/luxe,
+/// puce EMV dorée avec micro-gravures, symbole sans-contact NFC,
+/// logo de réseau net, numéro formaté par blocs avec frappe métallique, titulaire et expiration.
 struct RealisticCardView: View {
     let card: Card
     /// Numéro complet déjà déchiffré, ou `nil` pour l'affichage masqué.
@@ -21,9 +18,8 @@ struct RealisticCardView: View {
         return ArtVault.load(card.id.uuidString)
     }
 
-    /// Réseau à utiliser pour l'apparence : d'abord celui figé à la saisie
-    /// (persisté, non sensible), sinon détecté depuis le numéro révélé s'il
-    /// est fourni. Permet d'afficher le bon logo même à l'accueil.
+    /// Réseau à utiliser pour l'apparence : d'abord celui figé à la saisie,
+    /// sinon détecté depuis le numéro révélé s'il est fourni.
     private var network: CardNetwork {
         if card.network != .unknown {
             return card.network
@@ -34,42 +30,49 @@ struct RealisticCardView: View {
         return .unknown
     }
 
-    /// L'utilisateur a-t-il gardé la couleur par défaut ? Si oui, on habille
-    /// la carte avec le dégradé de marque de la banque (prioritaire) ou du
-    /// réseau détecté.
+    /// L'utilisateur a-t-il gardé la couleur par défaut ?
     private var usesDefaultColor: Bool {
-        card.colorHex.uppercased() == "#D62836"
+        card.colorHex.uppercased() == "#D62836" || card.colorHex.isEmpty
     }
 
-    /// L'utilisateur a-t-il choisi un design de réseau manuellement ? Dans ce
-    /// cas ses couleurs de marque priment sur celles de la banque détectée.
+    /// L'utilisateur a-t-il choisi un réseau manuellement ?
     private var hasManualNetwork: Bool {
         CardNetwork(rawValue: card.manualNetworkRaw).map { $0 != .unknown } ?? false
     }
 
+    /// Couleurs du dégradé de fond de la carte.
     private var gradientColors: [Color] {
         if usesDefaultColor {
             // Un design de réseau choisi à la main prime sur la banque détectée.
             if hasManualNetwork, network != .unknown {
                 return network.brandColors.map { Color(hex: $0) }
             }
-            // Sinon, priorité aux couleurs de la banque détectée (persistées),
-            // puis au dégradé du réseau.
+            // Priorité aux couleurs de la banque détectée (persistées).
             if !card.bankColorHex.isEmpty {
                 let base = Color(hex: card.bankColorHex)
-                return [base, base.opacity(0.78)]
+                return [base.opacity(0.95), base.opacity(0.70), Color(hex: "#0c0e14")]
             }
+            // Réseau détecté
             if network != .unknown {
-                return network.brandColors.map { Color(hex: $0) }
+                let netColors = network.brandColors.map { Color(hex: $0) }
+                if netColors.count >= 2 { return netColors }
+                if let first = netColors.first { return [first, first.opacity(0.75)] }
             }
+            // Défaut : Noir Titane / Satin Space Black luxueux (au lieu du rouge plat)
+            return [
+                Color(hex: "#262b36"),
+                Color(hex: "#161922"),
+                Color(hex: "#0c0e14")
+            ]
         }
         let base = Color(hex: card.colorHex)
-        return [base, base.opacity(0.72)]
+        return [base.opacity(0.95), base.opacity(0.65), Color(hex: "#0b0d13")]
     }
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            // 1. Fond dégradé de base
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: gradientColors,
@@ -77,149 +80,217 @@ struct RealisticCardView: View {
                         endPoint: .bottomTrailing
                     )
                 )
-                .overlay {
-                    // Design officiel intégré ou image personnalisée
-                    if let design = CardDesign.find(card.designID) {
-                        design.image
-                            .resizable()
-                            .scaledToFill()
-                            .overlay(
-                                LinearGradient(
-                                    colors: [.black.opacity(0.12), .black.opacity(0.55)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                            .allowsHitTesting(false)
-                    } else if let backgroundArt {
-                        Image(uiImage: backgroundArt)
-                            .resizable()
-                            .scaledToFill()
-                            .overlay(
-                                LinearGradient(
-                                    colors: [.black.opacity(0.20), .black.opacity(0.60)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                            .allowsHitTesting(false)
-                    }
-                }
-                .overlay(alignment: .topTrailing) {
-                    // Reflet diagonal discret pour un rendu « plastique ».
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [.white.opacity(0.22), .clear],
-                                startPoint: .topTrailing,
-                                endPoint: .center
-                            )
-                        )
-                        .allowsHitTesting(false)
-                }
 
+            // 2. Visuel CardArt ou photo personnalisée
+            if let design = CardDesign.find(card.designID) {
+                design.image
+                    .resizable()
+                    .scaledToFill()
+                    .overlay(
+                        LinearGradient(
+                            colors: [
+                                Color.black.opacity(0.10),
+                                Color.black.opacity(0.45)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .allowsHitTesting(false)
+            } else if let backgroundArt {
+                Image(uiImage: backgroundArt)
+                    .resizable()
+                    .scaledToFill()
+                    .overlay(
+                        LinearGradient(
+                            colors: [
+                                Color.black.opacity(0.15),
+                                Color.black.opacity(0.50)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .allowsHitTesting(false)
+            }
+
+            // 3. Reflet biseauté & brillance spéculaire authentique
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.20),
+                            Color.white.opacity(0.04),
+                            Color.clear
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .center
+                    )
+                )
+                .allowsHitTesting(false)
+
+            // 4. Bordure fine chanfreinée
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.35),
+                            Color.white.opacity(0.08),
+                            Color.clear,
+                            Color.black.opacity(0.5)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+                .allowsHitTesting(false)
+
+            // 5. Contenu textuel et symboles de la carte
             VStack(alignment: .leading, spacing: 0) {
-                // Ligne du haut : nom donné par l'utilisateur + logo réseau.
+                // Ligne du haut : Nom / Banque + Logo Réseau
                 HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(card.name)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.92))
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(.white.opacity(0.95))
+                            .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
                             .lineLimit(1)
+
                         if !card.bankName.isEmpty {
                             Text(card.bankName)
-                                .font(.caption2.weight(.medium))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.75))
+                                .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
                                 .lineLimit(1)
                         }
                     }
+
                     Spacer()
+
                     networkLogo
                 }
 
+                Spacer(minLength: 6)
+
+                // Ligne médiane : Puce EMV 3D + Symbole sans contact NFC
+                HStack(spacing: 12) {
+                    chipView
+
+                    Image(systemName: "wave.3.right")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.65))
+                        .rotationEffect(.degrees(90))
+                        .shadow(color: .black.opacity(0.3), radius: 1, y: 1)
+
+                    Spacer()
+                }
+                .padding(.top, 4)
+
                 Spacer(minLength: 8)
 
-                chip
-                    .padding(.top, 6)
-
-                Spacer(minLength: 8)
-
+                // Numéro de carte avec effet de frappe métallique
                 Text(displayedNumber)
-                    .font(.title3.weight(.semibold).monospaced())
+                    .font(.system(size: 19, weight: .bold, design: .monospaced))
+                    .tracking(1.8)
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
+                    .minimumScaleFactor(0.68)
+                    .shadow(color: .black.opacity(0.6), radius: 2, x: 0, y: 1)
 
-                Spacer(minLength: 10)
+                Spacer(minLength: 8)
 
-                HStack(alignment: .bottom, spacing: 20) {
+                // Ligne du bas : Titulaire & Expiration
+                HStack(alignment: .bottom, spacing: 24) {
                     labelValue("TITULAIRE", card.holder.isEmpty ? "—" : card.holder.uppercased())
-                    labelValue("EXPIRE", card.expiry.isEmpty ? "MM/AA" : card.expiry)
+                    labelValue("EXPIRE FIN", card.expiry.isEmpty ? "MM/AA" : card.expiry)
                     Spacer()
                 }
             }
-            .padding(20)
+            .padding(18)
         }
-        .frame(height: 210)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: .black.opacity(0.35), radius: 10, y: 6)
+        .frame(height: 205)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: .black.opacity(0.45), radius: 14, x: 0, y: 8)
     }
 
-    // MARK: - Éléments
+    // MARK: - Composants Visuels
 
-    /// Puce EMV stylisée (dorée, avec ses contacts).
-    private var chip: some View {
+    /// Puce EMV réaliste avec dorure brossée et micro-gravures.
+    private var chipView: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [Color(hex: "#E7C766"), Color(hex: "#B8912F")],
+                        colors: [
+                            Color(hex: "#F5DF88"),
+                            Color(hex: "#C89E28"),
+                            Color(hex: "#A37D18")
+                        ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .frame(width: 46, height: 34)
+                .frame(width: 44, height: 32)
+                .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
 
+            // Gravures des micro-contacts
             VStack(spacing: 4) {
                 ForEach(0..<3, id: \.self) { _ in
                     Rectangle()
-                        .fill(.black.opacity(0.28))
-                        .frame(height: 1)
+                        .fill(Color.black.opacity(0.35))
+                        .frame(height: 0.8)
                 }
             }
-            .frame(width: 34)
+            .frame(width: 32)
 
             Rectangle()
-                .fill(.black.opacity(0.28))
-                .frame(width: 1, height: 22)
+                .fill(Color.black.opacity(0.35))
+                .frame(width: 0.8, height: 20)
         }
         .overlay(
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(.black.opacity(0.15), lineWidth: 0.5)
+                .strokeBorder(Color.white.opacity(0.3), lineWidth: 0.5)
         )
     }
 
-    /// Logo du réseau : pastille lisible pour Visa/Amex/Discover, deux
-    /// disques entrelacés pour Mastercard. `.unknown` n'affiche rien.
+    /// Logo du réseau bancaire : design moderne et fidèle.
     @ViewBuilder
     private var networkLogo: some View {
         switch network {
         case .mastercard:
-            HStack(spacing: -10) {
-                Circle().fill(Color(hex: "#EB001B")).frame(width: 26, height: 26)
-                Circle().fill(Color(hex: "#F79E1B").opacity(0.9)).frame(width: 26, height: 26)
+            HStack(spacing: -9) {
+                Circle().fill(Color(hex: "#EB001B")).frame(width: 24, height: 24)
+                Circle().fill(Color(hex: "#F79E1B").opacity(0.92)).frame(width: 24, height: 24)
             }
-        case .visa, .amex, .discover:
-            Text(network.label)
-                .font(.footnote.weight(.heavy))
-                .italic(network == .visa)
+            .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
+        case .visa:
+            Text("VISA")
+                .font(.system(size: 15, weight: .black, design: .rounded))
+                .italic()
                 .foregroundStyle(.white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(.white.opacity(0.18), in: Capsule())
+                .background(Color.blue.opacity(0.85), in: RoundedRectangle(cornerRadius: 6))
+                .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
+        case .amex:
+            Text("AMEX")
+                .font(.system(size: 13, weight: .heavy))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Color(hex: "#006FCF"), in: RoundedRectangle(cornerRadius: 6))
+                .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
+        case .discover:
+            Text("DISCOVER")
+                .font(.system(size: 11, weight: .heavy))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Color(hex: "#FF6600"), in: RoundedRectangle(cornerRadius: 6))
+                .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
         case .unknown:
             EmptyView()
         }
@@ -228,13 +299,15 @@ struct RealisticCardView: View {
     private func labelValue(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.system(size: 8, weight: .semibold))
+                .font(.system(size: 7.5, weight: .bold))
                 .foregroundStyle(.white.opacity(0.65))
+                .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
             Text(value)
-                .font(.caption.weight(.medium).monospaced())
+                .font(.system(size: 12.5, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+                .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
         }
     }
 
@@ -248,9 +321,6 @@ struct RealisticCardView: View {
         return "•••• •••• •••• \(last)"
     }
 
-    /// Regroupe les chiffres selon les tailles de blocs du réseau
-    /// (4-6-5 pour Amex, 4-4-4-4 sinon). Les chiffres en trop sont
-    /// ajoutés en fin de chaîne par blocs de 4.
     private func grouped(_ digits: String, sizes: [Int]) -> String {
         var groups: [String] = []
         var index = digits.startIndex
@@ -260,7 +330,6 @@ struct RealisticCardView: View {
             groups.append(String(digits[index..<end]))
             index = end
         }
-        // Reste éventuel (numéros à 19 chiffres) par blocs de 4.
         while index < digits.endIndex {
             let end = digits.index(index, offsetBy: 4, limitedBy: digits.endIndex) ?? digits.endIndex
             groups.append(String(digits[index..<end]))

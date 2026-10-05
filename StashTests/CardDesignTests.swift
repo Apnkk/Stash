@@ -5,10 +5,10 @@ import Foundation
 @Suite("Tests du catalogue de designs de cartes")
 struct CardDesignTests {
 
-    @Test("Le catalogue contient exactement les 17 designs intégrés avec identifiants uniques")
+    @Test("Le catalogue contient exactement les 29 designs intégrés avec identifiants uniques")
     func testCatalogIntegrity() {
         let all = CardDesign.allDesigns
-        #expect(all.count == 17)
+        #expect(all.count == 29)
 
         let ids = all.map(\.id)
         let uniqueIDs = Set(ids)
@@ -19,6 +19,17 @@ struct CardDesignTests {
             #expect(!design.name.isEmpty)
             #expect(design.assetName == "CardDesigns/\(design.id)")
         }
+    }
+
+    @Test("Recommandation intelligente de designs selon la banque et le réseau")
+    func testRecommendations() {
+        let boursoRecs = CardDesign.recommended(network: .visa, bankName: "BoursoBank")
+        #expect(!boursoRecs.isEmpty)
+        #expect(boursoRecs.contains { $0.id.hasPrefix("boursobank") })
+
+        let amexRecs = CardDesign.recommended(network: .amex, bankName: "")
+        #expect(!amexRecs.isEmpty)
+        #expect(amexRecs.contains { $0.category == .amex })
     }
 
     @Test("Recherche de design par identifiant")
