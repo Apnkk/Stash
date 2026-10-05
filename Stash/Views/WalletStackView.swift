@@ -18,6 +18,7 @@ struct WalletStackView: View {
     @State private var dragOffset: CGFloat = 0
     @State private var showingPresentationCard: Card?
     @State private var barcodeCache: [UUID: UIImage] = [:]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let collapsedCardOffset: CGFloat = 68
     private let cardHeight: CGFloat = 210
@@ -52,7 +53,8 @@ struct WalletStackView: View {
                         .offset(y: calculateOffset(for: index, isExpanded: isExpanded))
                         .offset(y: isExpanded ? max(0, dragOffset) : 0)
                         .zIndex(isExpanded ? 999 : Double(index))
-                        .animation(Motion.spring, value: expandedCardID)
+                        .scaleEffect(isExpanded ? 1 - min(max(dragOffset, 0), 240) / 240 * 0.06 : 1, anchor: .top)
+                        .animation(stackAnimation(for: index), value: expandedCardID)
                         .animation(dragOffset == 0 ? Motion.spring : nil, value: dragOffset)
                         .gesture(
                             isExpanded ? DragGesture()
@@ -116,6 +118,14 @@ struct WalletStackView: View {
             // Les cartes en dessous glissent vers le bas
             return cardHeight + 200 + CGFloat(index - expandedIndex) * 30
         }
+    }
+
+    /// Ressort en cascade : les cartes proches de la carte ouverte bougent
+    /// en premier, les autres suivent avec un léger décalage (plafonné).
+    private func stackAnimation(for index: Int) -> Animation {
+        guard !reduceMotion else { return Motion.fade }
+        let anchor = cards.firstIndex(where: { $0.id == expandedCardID }) ?? 0
+        return Motion.spring.delay(Double(min(abs(index - anchor), 6)) * 0.018)
     }
 
     // MARK: - Interactions
@@ -188,7 +198,9 @@ private struct WalletStackItemView: View {
                 expandedActionsPanel
                     .transition(
                         .asymmetric(
-                            insertion: .scale(scale: 0.92, anchor: .top).combined(with: .opacity),
+                            insertion: .move(edge: .top)
+                                .combined(with: .scale(scale: 0.94, anchor: .top))
+                                .combined(with: .opacity),
                             removal: .opacity
                         )
                     )
@@ -196,7 +208,6 @@ private struct WalletStackItemView: View {
         }
         .opacity(isAnyExpanded && !isExpanded ? 0.4 : 1.0)
         .scaleEffect(isAnyExpanded && !isExpanded ? 0.95 : 1.0)
-        .blur(radius: isAnyExpanded && !isExpanded ? 2 : 0)
     }
 
     // MARK: Passe Fidélité

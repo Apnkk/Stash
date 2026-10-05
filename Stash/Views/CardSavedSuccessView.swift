@@ -25,6 +25,7 @@ struct CardSavedSuccessView: View {
     @State private var textVisible = false
     @State private var burst = false
     @State private var finished = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Particules réparties en cercle autour de la coche.
     private let particles: [Particle] = Particle.ring(count: 12)
@@ -117,6 +118,22 @@ struct CardSavedSuccessView: View {
     /// Joue l'animation d'entrée en cascade puis programme la fermeture auto.
     private func runSequence() {
         Haptics.success()
+
+        // "Réduire les animations" : état final direct, simple fondu, sans particules.
+        if reduceMotion {
+            withAnimation(Motion.fade) {
+                circleScale = 1
+                circleOpacity = 1
+                checkProgress = 1
+                haloOpacity = 0.35
+                haloScale = 1
+                textVisible = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + autoDismissAfter) {
+                finish()
+            }
+            return
+        }
 
         // 1. Le cercle éclot.
         withAnimation(.spring(response: 0.45, dampingFraction: 0.6)) {

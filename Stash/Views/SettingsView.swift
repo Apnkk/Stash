@@ -174,6 +174,7 @@ struct SettingsView: View {
                     Section {
                         HStack(spacing: 8) {
                             Image(systemName: messageIsError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                                .symbolEffect(.bounce, value: message)
                                 .foregroundStyle(messageIsError ? .red : .green)
                             Text(message)
                                 .font(.footnote)
@@ -185,7 +186,7 @@ struct SettingsView: View {
                 // MARK: Infos app
                 Section {
                     LabeledContent("Cartes enregistrées", value: "\(store.cards.count)")
-                    LabeledContent("Version", value: "2.2.0 (build 22)")
+                    LabeledContent("Version", value: "2.3.0 (build 23)")
                 } header: {
                     Text("Informations")
                 } footer: {
@@ -338,8 +339,10 @@ struct SettingsView: View {
     }
 
     private func show(_ text: String, isError: Bool) {
-        message = text
-        messageIsError = isError
+        withAnimation(Motion.standard) {
+            message = text
+            messageIsError = isError
+        }
     }
 }
 

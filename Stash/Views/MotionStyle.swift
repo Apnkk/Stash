@@ -122,10 +122,11 @@ struct PressableModifier: ViewModifier {
     var haptic: Bool = true
 
     @State private var isPressed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content
-            .scaleEffect(isPressed ? scale : 1)
+            .scaleEffect(isPressed && !reduceMotion ? scale : 1)
             .opacity(isPressed ? 0.9 : 1)
             .animation(Motion.snappy, value: isPressed)
             .simultaneousGesture(
@@ -148,14 +149,21 @@ struct AppearTransitionModifier: ViewModifier {
     var step: Double = 0.06
 
     @State private var visible = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content
             .opacity(visible ? 1 : 0)
-            .offset(y: visible ? 0 : 16)
+            .offset(y: visible || reduceMotion ? 0 : 16)
             .onAppear {
-                withAnimation(Motion.staggered(Motion.soft, index: index, step: step)) {
-                    visible = true
+                if reduceMotion {
+                    withAnimation(Motion.fade) { visible = true }
+                } else {
+                    // Plafonne le délai pour que les longues listes ne mettent pas des secondes à apparaître.
+                    let cappedIndex = min(index, 8)
+                    withAnimation(Motion.staggered(Motion.soft, index: cappedIndex, step: step)) {
+                        visible = true
+                    }
                 }
             }
     }

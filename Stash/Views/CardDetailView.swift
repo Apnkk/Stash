@@ -289,6 +289,7 @@ struct CardDetailView: View {
                     .font(.footnote.monospaced())
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
+                    .transition(.riseAndFade)
             }
 
             if let error = authError {
@@ -296,6 +297,7 @@ struct CardDetailView: View {
                     .font(.footnote)
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
+                    .transition(.riseAndFade)
             }
 
             if isCaptured {
@@ -303,6 +305,7 @@ struct CardDetailView: View {
                     .font(.footnote)
                     .foregroundStyle(.orange)
                     .multilineTextAlignment(.center)
+                    .transition(.riseAndFade)
             }
 
             if revealedNumber == nil {
@@ -317,6 +320,7 @@ struct CardDetailView: View {
                 .glassProminentButtonIfAvailable()
                 .pressable()
                 .disabled(isCaptured)
+                .transition(.popIn)
             } else {
                 HStack(spacing: 12) {
                     Button {
@@ -339,6 +343,7 @@ struct CardDetailView: View {
                     .glassProminentButtonIfAvailable()
                     .pressable()
                 }
+                .transition(.popIn)
             }
 
             Text("Le sans-contact n'est pas possible : Apple réserve le paiement NFC à Apple Pay. Cette app stocke et affiche tes cartes de façon sécurisée.")
@@ -347,6 +352,9 @@ struct CardDetailView: View {
                 .multilineTextAlignment(.center)
                 .padding(.top, 4)
         }
+        .animation(Motion.standard, value: revealedNumber != nil)
+        .animation(Motion.snappy, value: authError)
+        .animation(Motion.standard, value: isCaptured)
     }
 
     private var displayedNumber: String {

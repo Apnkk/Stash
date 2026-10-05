@@ -15,11 +15,11 @@ struct StashApp: App {
                 if lock.isUnlocked {
                     CardListView()
                         .environmentObject(store)
-                        .transition(.opacity)
+                        .transition(.opacity.combined(with: .scale(scale: 1.02)))
                 } else {
                     LockScreenView()
                         .environmentObject(lock)
-                        .transition(.opacity)
+                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
                 }
 
                 // L'onboarding recouvre tout au tout premier lancement ; il se

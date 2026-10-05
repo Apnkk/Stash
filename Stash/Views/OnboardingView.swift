@@ -182,6 +182,7 @@ private struct OnboardingPage {
 /// doux pour un rendu premium et interruptible.
 private struct AnimatedCardStack: View {
     let highlightIndex: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Dégradés distincts (rouge/bordeaux/noir) pour différencier les cartes.
     private let gradients: [[Color]] = [
@@ -232,7 +233,7 @@ private struct AnimatedCardStack: View {
             )
             .opacity(isFront ? 1 : 0.7)
             .zIndex(isFront ? 3 : Double(3 - relative))
-            .animation(Motion.soft, value: highlightIndex)
+            .animation(reduceMotion ? Motion.fade : Motion.soft, value: highlightIndex)
     }
 
     /// Puce EMV dorée miniature, cohérente avec le reste de l'app.

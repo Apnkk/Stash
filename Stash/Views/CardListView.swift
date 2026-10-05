@@ -298,15 +298,16 @@ private struct EmptyStateView: View {
 
     @State private var pulse = false
     @State private var appeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 14) {
             Image(systemName: "creditcard.fill")
                 .font(.system(size: 56))
                 .foregroundStyle(.tint)
-                .scaleEffect(pulse ? 1.06 : 0.94)
+                .scaleEffect(pulse && !reduceMotion ? 1.06 : 0.94)
                 .animation(
-                    .easeInOut(duration: 1.8).repeatForever(autoreverses: true),
+                    reduceMotion ? nil : .easeInOut(duration: 1.8).repeatForever(autoreverses: true),
                     value: pulse
                 )
             Text("Aucune carte")
@@ -345,6 +346,7 @@ struct CardTileView: View {
     var isHighlighted: Bool = false
 
     @State private var glow = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Image de fond éventuelle de la vignette (chargée depuis ArtVault).
     private var backgroundArt: UIImage? {
@@ -484,8 +486,11 @@ struct CardTileView: View {
             }
         }
         .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
-        .scaleEffect(isHighlighted && glow ? 1.03 : 1)
-        .animation(.easeInOut(duration: 0.8).repeatCount(3, autoreverses: true), value: glow)
+        .scaleEffect(isHighlighted && glow && !reduceMotion ? 1.03 : 1)
+        .animation(
+            reduceMotion ? Motion.fade : .easeInOut(duration: 0.8).repeatCount(3, autoreverses: true),
+            value: glow
+        )
         .onChange(of: isHighlighted) { _, newValue in
             if newValue {
                 Haptics.success()
