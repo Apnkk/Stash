@@ -37,7 +37,7 @@ struct CardDesignTests {
         let centurion = CardDesign.find("amex-centurion-black")
         #expect(centurion != nil)
         #expect(centurion?.name == "Centurion Noir")
-        #expect(centurion?.category == .black)
+        #expect(centurion?.category == .amex)
         #expect(centurion?.recommendedNetwork == .amex)
 
         let unknown = CardDesign.find("design-inexistant")
