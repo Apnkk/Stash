@@ -2,8 +2,8 @@ import SwiftUI
 import PhotosUI
 
 /// Flux d'ajout d'une carte bancaire inspiré d'Apple Wallet :
-/// immersif, élégant, avec prévisualisation réaliste en temps réel et
-/// galerie interactive de designs CardArt intégrée directement dans le flux.
+/// immersif, respirant, avec prévisualisation 3D réaliste en direct,
+/// adaptation fluide au clavier et intégration du CardArt Studio.
 struct AddBankCardFlowView: View {
     @EnvironmentObject private var store: CardStore
     @Environment(\.dismiss) private var dismiss
@@ -18,9 +18,9 @@ struct AddBankCardFlowView: View {
         var title: String {
             switch self {
             case .number:  return "Numéro de carte"
-            case .details: return "Détails de la carte"
-            case .design:  return "Design CardArt"
-            case .review:  return "Vérification"
+            case .details: return "Détails essentiels"
+            case .design:  return "CardArt Studio"
+            case .review:  return "Scellé & Sécurité"
             }
         }
 
@@ -28,8 +28,8 @@ struct AddBankCardFlowView: View {
             switch self {
             case .number:  return "Saisis ou scanne les chiffres de ta carte bancaire."
             case .details: return "Date d'expiration, titulaire et nom personnalisé."
-            case .design:  return "Sélectionne un visuel officiel CardArt ou importe une image."
-            case .review:  return "Vérifie les informations avant l'enregistrement sécurisé."
+            case .design:  return "Choisis un visuel officiel ou importe n'importe quelle carte."
+            case .review:  return "Vérifie les informations avant le chiffrement Keychain."
             }
         }
     }
@@ -46,9 +46,8 @@ struct AddBankCardFlowView: View {
     @State private var manualNetwork: CardNetwork = .unknown
     @State private var designID = ""
     @State private var customArtImage: UIImage? = nil
-    @State private var selectedPhotoItem: PhotosPickerItem? = nil
+    @State private var showChip: Bool = true
 
-    @State private var selectedDesignCategory: CardDesignCategory = .all
     @State private var saveError: String?
     @State private var showingScanner = false
     @State private var savedCardName: String?
@@ -119,7 +118,7 @@ struct AddBankCardFlowView: View {
         }
     }
 
-    /// Carte reconstruite en direct pour l'aperçu instantané en haut de l'écran.
+    /// Carte reconstruite en direct pour l'aperçu dynamique au sommet.
     private var previewCard: Card {
         var c = Card(kind: .bank, name: effectiveName)
         c.colorHex = colorHex
@@ -133,16 +132,9 @@ struct AddBankCardFlowView: View {
         }
         c.manualNetworkRaw = manualNetwork == .unknown ? "" : manualNetwork.rawValue
         c.designID = designID
+        c.showChip = showChip
         c.hasCustomArt = customArtImage != nil
         return c
-    }
-
-    /// Designs à afficher selon la catégorie sélectionnée ou la recommandation automatique.
-    private var filteredDesigns: [CardDesign] {
-        if selectedDesignCategory == .all {
-            return CardDesign.allDesigns
-        }
-        return CardDesign.allDesigns.filter { $0.category == selectedDesignCategory }
     }
 
     // MARK: - Corps
@@ -150,33 +142,37 @@ struct AddBankCardFlowView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // 1. Barre de progression discrète
-                steppedProgressBar
-                    .padding(.horizontal, 24)
-                    .padding(.top, 10)
-                    .padding(.bottom, 6)
+                // 1. Barre de progression ultra-fine et discrète
+                progressHeader
+                    .padding(.top, 4)
+                    .padding(.bottom, 8)
 
-                // 2. Contenu défilant avec la carte en vedette
+                // 2. Contenu défilant fluide
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 20) {
-                        // Carte Réaliste toujours visible en haut (avec morphing dynamique)
+                    VStack(spacing: focusedField != nil ? 14 : 20) {
+                        // Carte Réaliste 3D avec adaptation douce au clavier
                         RealisticCardView(
                             card: previewCard,
                             revealedNumber: numberDigits.isEmpty ? nil : numberDigits,
-                            artOverride: customArtImage
+                            artOverride: customArtImage,
+                            enableTilt: true,
+                            showChipOverride: showChip
                         )
+                        .scaleEffect(focusedField != nil ? 0.85 : 1.0, anchor: .top)
                         .padding(.horizontal, 20)
-                        .padding(.top, 6)
+                        .padding(.top, 4)
+                        .animation(Motion.snappy, value: focusedField != nil)
                         .animation(Motion.snappy, value: colorHex)
                         .animation(Motion.snappy, value: manualNetwork)
                         .animation(Motion.snappy, value: numberDigits)
                         .animation(Motion.snappy, value: designID)
                         .animation(Motion.snappy, value: customArtImage != nil)
+                        .animation(Motion.snappy, value: showChip)
 
-                        // En-tête de l'étape
+                        // En-tête typographique de l'étape
                         stepHeader
 
-                        // Contenu spécifique à l'étape
+                        // Contenu de l'étape
                         stepContent
                             .padding(.horizontal, 20)
                             .id(step)
@@ -193,12 +189,12 @@ struct AddBankCardFlowView: View {
                     .padding(.bottom, 24)
                 }
 
-                // 3. Pied de page avec boutons de navigation
+                // 3. Pied de page avec bouton d'action principal
                 footer
                     .padding(.horizontal, 20)
                     .padding(.top, 10)
                     .padding(.bottom, 12)
-                    .background(Color(uiColor: .systemBackground).opacity(0.85))
+                    .background(Color(uiColor: .systemBackground).opacity(0.90))
             }
             .navigationTitle("Nouvelle carte")
             .navigationBarTitleDisplayMode(.inline)
@@ -210,12 +206,17 @@ struct AddBankCardFlowView: View {
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "chevron.left")
-                                    .font(.subheadline.weight(.semibold))
+                                    .font(.system(size: 14, weight: .semibold))
                                 Text("Retour")
                                     .font(.subheadline)
                             }
                             .foregroundStyle(Color.stashRed)
                         }
+                    } else {
+                        Button("Annuler") {
+                            dismiss()
+                        }
+                        .foregroundStyle(.secondary)
                     }
                 }
 
@@ -225,7 +226,7 @@ struct AddBankCardFlowView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title3)
-                            .foregroundStyle(.secondary.opacity(0.8))
+                            .foregroundStyle(.secondary.opacity(0.7))
                     }
                 }
             }
@@ -252,7 +253,6 @@ struct AddBankCardFlowView: View {
                 onBankCardScanned: { number, exp in
                     self.fullNumber = formatCardNumber(number)
                     if let exp { self.expiry = exp }
-                    // Auto-détection intelligente du nom de la banque
                     let brand = BINDatabase.brandInfo(for: number.filter(\.isNumber))
                     if let bank = brand.bankName, self.name.isEmpty {
                         self.name = bank
@@ -260,43 +260,55 @@ struct AddBankCardFlowView: View {
                 }
             )
         }
-        .onChange(of: selectedPhotoItem) { _, newItem in
-            guard let newItem else { return }
-            Task {
-                if let data = try? await newItem.loadTransferable(type: Data.self),
-                   let uiImg = UIImage(data: data) {
-                    await MainActor.run {
-                        self.customArtImage = uiImg
-                        self.designID = ""
-                        Haptics.selection()
-                    }
-                }
-            }
-        }
     }
 
-    // MARK: - Barre de progression
+    // MARK: - Barre de progression délicate
 
-    private var steppedProgressBar: some View {
-        HStack(spacing: 6) {
-            ForEach(Step.allCases, id: \.rawValue) { s in
-                Capsule()
-                    .fill(s.rawValue <= step.rawValue ? Color.stashRed : Color.secondary.opacity(0.18))
-                    .frame(height: 3.5)
-                    .animation(Motion.snappy, value: step)
+    private var progressHeader: some View {
+        VStack(spacing: 6) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.12))
+                        .frame(height: 2.5)
+
+                    Capsule()
+                        .fill(Color.stashRed)
+                        .frame(
+                            width: max(0, geo.size.width * CGFloat(step.rawValue + 1) / CGFloat(Step.allCases.count)),
+                            height: 2.5
+                        )
+                        .animation(Motion.snappy, value: step)
+                }
             }
+            .frame(height: 2.5)
+            .padding(.horizontal, 24)
+
+            HStack {
+                Text("Étape \(step.rawValue + 1) sur \(Step.allCases.count)")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                    .tracking(0.8)
+
+                Spacer()
+
+                Text(step.title)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.stashRed)
+            }
+            .padding(.horizontal, 26)
         }
-        .accessibilityElement()
-        .accessibilityLabel("Étape \(step.rawValue + 1) sur \(Step.allCases.count) : \(step.title)")
     }
 
     // MARK: - En-tête d'étape
 
     private var stepHeader: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 3) {
             Text(step.title)
                 .font(.title3.weight(.bold))
                 .multilineTextAlignment(.center)
+
             Text(step.subtitle)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -315,7 +327,7 @@ struct AddBankCardFlowView: View {
         switch step {
         case .number:  numberStep
         case .details: detailsStep
-        case .design:  cardArtDesignStep
+        case .design:  cardArtStudioStep
         case .review:  reviewStep
         }
     }
@@ -324,25 +336,23 @@ struct AddBankCardFlowView: View {
 
     private var numberStep: some View {
         VStack(spacing: 16) {
-            // Boîte de saisie principale
-            VStack(alignment: .leading, spacing: 8) {
+            // Bloc de saisie
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 12) {
                     Image(systemName: "creditcard.fill")
                         .font(.title3)
                         .foregroundStyle(Color.stashRed)
 
-                    TextField("1234 5678 9012 3456", text: $fullNumber)
+                    TextField("•••• •••• •••• ••••", text: $fullNumber)
                         .keyboardType(.numberPad)
-                        .font(.title3.weight(.semibold).monospaced())
+                        .font(.system(size: 20, weight: .semibold, design: .monospaced))
                         .textContentType(.creditCardNumber)
                         .focused($focusedField, equals: .number)
                         .onChange(of: fullNumber) { _, newValue in
                             fullNumber = formatCardNumber(newValue)
-                            // Pré-remplit le nom si une banque est identifiée
                             if name.isEmpty, let bank = detectedBrandInfo.bankName {
                                 name = bank
                             }
-                            // Auto-sélectionne le design recommandé si disponible
                             if designID.isEmpty {
                                 let recs = CardDesign.recommended(
                                     network: detectedNetwork,
@@ -361,53 +371,68 @@ struct AddBankCardFlowView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Color.stashRed, in: Capsule())
-                            .transition(.popIn)
+                            .transition(.scale.combined(with: .opacity))
                     }
                 }
                 .padding(16)
                 .glassPanel(cornerRadius: 16)
 
+                // Badge de banque détectée
                 if let bank = detectedBrandInfo.bankName {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.caption)
                             .foregroundStyle(.green)
-                        Text("Banque détectée : \(bank)")
-                            .font(.caption.weight(.medium))
+                        Text("Émetteur : \(bank)")
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 6)
                     .transition(.opacity)
                 }
 
-                if !numberDigits.isEmpty && !numberIsValid {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                        Text("Vérifie les chiffres de ta carte (algorithme de Luhn).")
-                            .font(.caption)
-                            .foregroundStyle(.red)
+                // Validation Luhn en temps réel
+                if !numberDigits.isEmpty {
+                    if numberIsValid {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                            Text("Numéro valide (clé Luhn)")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.green)
+                        }
+                        .padding(.horizontal, 6)
+                        .transition(.opacity)
+                    } else if numberDigits.count >= 13 {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                            Text("Vérifie les chiffres de ta carte.")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
+                        .padding(.horizontal, 6)
+                        .transition(.opacity)
                     }
-                    .padding(.horizontal, 4)
-                    .transition(.opacity)
                 }
             }
 
-            // Bouton Scanner caméra unique et soigné
+            // Bouton de scan appareil photo unique et soigné
             Button {
                 Haptics.light()
                 showingScanner = true
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "camera.viewfinder")
-                        .font(.body.weight(.semibold))
-                    Text("Scanner avec la caméra")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("Scanner avec l'appareil photo")
                         .font(.subheadline.weight(.semibold))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Color.stashRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+                .glassPanel(cornerRadius: 14)
                 .foregroundStyle(Color.stashRed)
             }
             .buttonStyle(.plain)
@@ -420,7 +445,7 @@ struct AddBankCardFlowView: View {
 
     private var detailsStep: some View {
         VStack(spacing: 16) {
-            // Date d'expiration & Titulaire
+            // Expiration & Titulaire
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -453,7 +478,7 @@ struct AddBankCardFlowView: View {
                 .glassPanel(cornerRadius: 16)
 
                 if !expiryIsValid {
-                    Text("Date d'expiration invalide ou déjà dépassée.")
+                    Text("Date d'expiration invalide ou déjà expirée.")
                         .font(.caption)
                         .foregroundStyle(.red)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -461,7 +486,7 @@ struct AddBankCardFlowView: View {
                 }
             }
 
-            // Nom personnalisé de la carte
+            // Nom personnalisé
             VStack(alignment: .leading, spacing: 6) {
                 Text("Nom dans Stash")
                     .font(.caption.weight(.semibold))
@@ -479,7 +504,7 @@ struct AddBankCardFlowView: View {
                 .glassPanel(cornerRadius: 14)
             }
 
-            // Choix manuel du réseau bancaire
+            // Réseau bancaire manuel (optionnel)
             VStack(alignment: .leading, spacing: 6) {
                 Text("Réseau bancaire")
                     .font(.caption.weight(.semibold))
@@ -498,141 +523,20 @@ struct AddBankCardFlowView: View {
         .animation(Motion.snappy, value: expiryIsValid)
     }
 
-    // MARK: - Étape 3 : Le Grand Choix du Design CardArt
+    // MARK: - Étape 3 : CardArt Studio
 
-    private var cardArtDesignStep: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Filtres thématiques CardArt
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(CardDesignCategory.allCases) { cat in
-                        Button {
-                            Haptics.selection()
-                            withAnimation(Motion.snappy) {
-                                selectedDesignCategory = cat
-                            }
-                        } label: {
-                            HStack(spacing: 5) {
-                                Image(systemName: cat.icon)
-                                    .font(.caption2)
-                                Text(cat.label)
-                                    .font(.caption.weight(selectedDesignCategory == cat ? .semibold : .medium))
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(
-                                selectedDesignCategory == cat ? Color.stashRed : Color.secondary.opacity(0.14),
-                                in: Capsule()
-                            )
-                            .foregroundStyle(selectedDesignCategory == cat ? Color.white : Color.primary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 2)
-            }
-
-            // Grille visuelle des designs officiels CardArt
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 145), spacing: 12)], spacing: 12) {
-                ForEach(filteredDesigns) { design in
-                    cardArtDesignTile(design)
-                }
-            }
-
-            Divider().padding(.vertical, 4)
-
-            // Option 1 : Importer une carte personnalisée depuis Photos ou Fichiers
-            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.blue.opacity(0.15))
-                            .frame(width: 36, height: 36)
-                        Image(systemName: "photo.on.rectangle.angled")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.blue)
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Importer une image perso")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                        Text("Choisis n'importe quelle carte parmi tes photos ou fichiers.")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    if customArtImage != nil {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(.blue)
-                    } else {
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(12)
-                .glassPanel(cornerRadius: 14)
-            }
-            .buttonStyle(.plain)
-
-            // Option 2 : Teinte & Couleur personnalisée
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Ou choisis une couleur de carte :")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                colorPicker
-            }
-        }
+    private var cardArtStudioStep: some View {
+        CardArtStudioView(
+            selectedDesignID: $designID,
+            customArtImage: $customArtImage,
+            colorHex: $colorHex,
+            showChip: $showChip,
+            recommendedNetwork: detectedNetwork,
+            detectedBankName: detectedBrandInfo.bankName ?? ""
+        )
     }
 
-    private func cardArtDesignTile(_ design: CardDesign) -> some View {
-        let isSelected = designID == design.id && customArtImage == nil
-
-        return Button {
-            Haptics.selection()
-            withAnimation(Motion.snappy) {
-                designID = design.id
-                customArtImage = nil
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                ZStack(alignment: .topTrailing) {
-                    design.image
-                        .resizable()
-                        .aspectRatio(1.585, contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 10)
-                                .strokeBorder(
-                                    isSelected ? Color.stashRed : Color.white.opacity(0.15),
-                                    lineWidth: isSelected ? 2.5 : 1
-                                )
-                        }
-
-                    if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(Color.white, Color.stashRed)
-                            .padding(6)
-                            .transition(.scale)
-                    }
-                }
-
-                Text(design.name)
-                    .font(.caption2.weight(isSelected ? .bold : .medium))
-                    .foregroundStyle(isSelected ? Color.stashRed : Color.primary)
-                    .lineLimit(1)
-            }
-            .padding(4)
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Étape 4 : Récapitulatif
+    // MARK: - Étape 4 : Scellé & Sécurité
 
     private var reviewStep: some View {
         VStack(spacing: 16) {
@@ -643,23 +547,24 @@ struct AddBankCardFlowView: View {
                 reviewRow("Titulaire", holder.isEmpty ? "—" : holder)
                 reviewRow("Expiration", expiry.isEmpty ? "—" : expiry)
                 if let design = CardDesign.find(designID) {
-                    reviewRow("Design choisi", design.name)
+                    reviewRow("Visuel choisi", design.name)
                 } else if customArtImage != nil {
-                    reviewRow("Design choisi", "Image personnalisée")
+                    reviewRow("Visuel choisi", "Image personnalisée (CardArt)")
                 }
             }
             .padding(16)
             .glassPanel(cornerRadius: 16)
 
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Image(systemName: "faceid")
-                    .font(.title2)
+                    .font(.title)
                     .foregroundStyle(Color.stashRed)
+
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Stockage sécurisé Keychain")
+                    Text("Coffre-fort chiffré Keychain")
                         .font(.subheadline.weight(.semibold))
-                    Text("Numéro complet chiffré. Accessible par Face ID ou code.")
-                        .font(.caption)
+                    Text("Le numéro complet est protégé par la puce matérielle Secure Enclave.")
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -680,61 +585,35 @@ struct AddBankCardFlowView: View {
         }
     }
 
-    // MARK: - Nuancier de couleurs
-
-    private var colorPicker: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 40), spacing: 10)], spacing: 10) {
-            ForEach(Palette.colors, id: \.self) { hex in
-                Circle()
-                    .fill(Color(hex: hex))
-                    .frame(width: 34, height: 34)
-                    .overlay {
-                        if hex == colorHex && designID.isEmpty && customArtImage == nil {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(Color.white)
-                        }
-                    }
-                    .scaleEffect(hex == colorHex ? 1.08 : 1)
-                    .onTapGesture {
-                        Haptics.selection()
-                        withAnimation(Motion.snappy) {
-                            colorHex = hex
-                            designID = ""
-                            customArtImage = nil
-                        }
-                    }
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
     // MARK: - Pied de page
 
     private var footer: some View {
-        HStack(spacing: 12) {
-            Button {
-                if step == .review {
-                    save()
-                } else {
-                    goNext()
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    if step == .review {
-                        Image(systemName: "lock.shield.fill")
-                    }
-                    Text(step == .review ? "Enregistrer la carte" : "Continuer")
-                        .font(.headline)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(canAdvance ? Color.stashRed : Color.secondary.opacity(0.2), in: RoundedRectangle(cornerRadius: 14))
-                .foregroundStyle(canAdvance ? Color.white : Color.secondary)
+        Button {
+            if step == .review {
+                save()
+            } else {
+                goNext()
             }
-            .buttonStyle(.plain)
-            .disabled(!canAdvance)
+        } label: {
+            HStack(spacing: 8) {
+                if step == .review {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.body.weight(.bold))
+                }
+                Text(step == .review ? "Enregistrer dans mon coffre-fort" : "Continuer")
+                    .font(.headline)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 15)
+            .background(
+                canAdvance ? Color.stashRed : Color.secondary.opacity(0.18),
+                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+            )
+            .foregroundStyle(canAdvance ? Color.white : Color.secondary)
+            .shadow(color: canAdvance ? Color.stashRed.opacity(0.35) : Color.clear, radius: 8, y: 4)
         }
+        .buttonStyle(.plain)
+        .disabled(!canAdvance)
     }
 
     // MARK: - Navigation & Transitions
@@ -821,8 +700,8 @@ struct AddBankCardFlowView: View {
         card.bankColorHex = brand.brandColors?.first ?? ""
         card.manualNetworkRaw = manualNetwork == .unknown ? "" : manualNetwork.rawValue
         card.designID = designID
+        card.showChip = showChip
 
-        // Si une image personnalisée a été importée depuis les photos
         if let customArtImage {
             do {
                 try ArtVault.save(customArtImage, for: card.id.uuidString)
@@ -834,6 +713,7 @@ struct AddBankCardFlowView: View {
 
         do {
             try store.upsert(card, fullNumber: fullNumber)
+            Haptics.success()
             withAnimation(Motion.standard) {
                 savedCardName = card.name
             }

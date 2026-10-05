@@ -230,6 +230,9 @@ struct Card: Identifiable, Codable, Equatable, Hashable {
     /// Identifiant du design de carte officiel intégré ("" si utilisation de la couleur/photo).
     var designID: String
 
+    /// Indique si la puce physique EMV doit être affichée (désactivable si le visuel CardArt en a déjà une imprimée).
+    var showChip: Bool
+
     /// L'utilisateur a-t-il associé une image de fond à cette carte ? Le fichier
     /// lui-même vit dans `ArtVault` (dossier Application Support), indexé par
     /// `id` ; on ne garde ici qu'un drapeau non sensible pour savoir s'il faut
@@ -255,7 +258,8 @@ struct Card: Identifiable, Codable, Equatable, Hashable {
         hasCustomArt: Bool = false,
         isFavorite: Bool = false,
         lastUsedAt: Date? = nil,
-        designID: String = ""
+        designID: String = "",
+        showChip: Bool = true
     ) {
         self.id = id
         self.kind = kind
@@ -276,12 +280,13 @@ struct Card: Identifiable, Codable, Equatable, Hashable {
         self.isFavorite = isFavorite
         self.lastUsedAt = lastUsedAt
         self.designID = designID
+        self.showChip = showChip
     }
 
     // Décodage tolérant : les cartes déjà enregistrées (avant l'ajout de
-    // `note`/`createdAt`/`isFavorite`/`lastUsedAt`/`designID`) ne possèdent pas ces clés → valeurs par défaut.
+    // `note`/`createdAt`/`isFavorite`/`lastUsedAt`/`designID`/`showChip`) ne possèdent pas ces clés → valeurs par défaut.
     enum CodingKeys: String, CodingKey {
-        case id, kind, name, colorHex, code, format, holder, expiry, lastFour, networkRaw, manualNetworkRaw, bankName, bankColorHex, note, createdAt, hasCustomArt, isFavorite, lastUsedAt, designID
+        case id, kind, name, colorHex, code, format, holder, expiry, lastFour, networkRaw, manualNetworkRaw, bankName, bankColorHex, note, createdAt, hasCustomArt, isFavorite, lastUsedAt, designID, showChip
     }
 
     init(from decoder: Decoder) throws {
@@ -305,6 +310,7 @@ struct Card: Identifiable, Codable, Equatable, Hashable {
         isFavorite = try c.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
         lastUsedAt = try c.decodeIfPresent(Date.self, forKey: .lastUsedAt)
         designID = try c.decodeIfPresent(String.self, forKey: .designID) ?? ""
+        showChip = try c.decodeIfPresent(Bool.self, forKey: .showChip) ?? true
     }
 
     /// Réseau bancaire utilisé pour l'apparence. Priorité au choix MANUEL de

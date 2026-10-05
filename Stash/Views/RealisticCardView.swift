@@ -10,6 +10,40 @@ struct RealisticCardView: View {
     /// Image de fond injectée pour l'aperçu direct (formulaire). Si `nil`, on
     /// charge l'image persistée via `ArtVault` quand `card.hasCustomArt`.
     var artOverride: UIImage? = nil
+    /// Active le geste tactile d'inclinaison 3D physique et de reflet lumineux.
+    var enableTilt: Bool = true
+    /// Permet de forcer l'affichage ou le masquage de la puce EMV (utile pour le CardArt Studio).
+    var showChipOverride: Bool? = nil
+
+    @State private var dragOffset: CGSize = .zero
+    @State private var isInteracting: Bool = false
+
+    /// Inclinaison verticale 3D (pitch) en degrés.
+    private var pitchDegrees: Double {
+        let maxAngle: Double = 12.0
+        let normalized = Double(-dragOffset.height) / 90.0
+        return min(max(normalized * maxAngle, -maxAngle), maxAngle)
+    }
+
+    /// Inclinaison horizontale 3D (roll) en degrés.
+    private var rollDegrees: Double {
+        let maxAngle: Double = 14.0
+        let normalized = Double(dragOffset.width) / 90.0
+        return min(max(normalized * maxAngle, -maxAngle), maxAngle)
+    }
+
+    /// Déplacement du reflet spéculaire synchronisé avec l'angle de vue.
+    private var specularLocation: Double {
+        let base = 0.42
+        let shift = (rollDegrees / 35.0) - (pitchDegrees / 45.0)
+        return min(max(base + shift, 0.1), 0.85)
+    }
+
+    /// Affiche ou non la puce physique EMV.
+    private var effectiveShowChip: Bool {
+        if let override = showChipOverride { return override }
+        return card.showChip
+    }
 
     /// Image de fond effective : l'override d'aperçu prime, sinon celle stockée.
     private var backgroundArt: UIImage? {
@@ -89,8 +123,8 @@ struct RealisticCardView: View {
                     .overlay(
                         LinearGradient(
                             colors: [
-                                Color.black.opacity(0.10),
-                                Color.black.opacity(0.45)
+                                Color.black.opacity(0.08),
+                                Color.black.opacity(0.42)
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -105,8 +139,8 @@ struct RealisticCardView: View {
                     .overlay(
                         LinearGradient(
                             colors: [
-                                Color.black.opacity(0.15),
-                                Color.black.opacity(0.50)
+                                Color.black.opacity(0.12),
+                                Color.black.opacity(0.48)
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -116,30 +150,32 @@ struct RealisticCardView: View {
                     .allowsHitTesting(false)
             }
 
-            // 3. Reflet biseauté & brillance spéculaire authentique
+            // 3. Brillance spéculaire holographique dynamique (réagissant à l'inclinaison)
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.20),
-                            Color.white.opacity(0.04),
-                            Color.clear
+                        stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: .white.opacity(isInteracting ? 0.32 : 0.16), location: specularLocation),
+                            .init(color: .white.opacity(isInteracting ? 0.08 : 0.02), location: min(specularLocation + 0.22, 1.0)),
+                            .init(color: .clear, location: 1.0)
                         ],
                         startPoint: .topLeading,
-                        endPoint: .center
+                        endPoint: .bottomTrailing
                     )
                 )
+                .blendMode(.overlay)
                 .allowsHitTesting(false)
 
-            // 4. Bordure fine chanfreinée
+            // 4. Bordure fine chanfreinée & liseré de lumière zénithale
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.35),
-                            Color.white.opacity(0.08),
+                            Color.white.opacity(0.40),
+                            Color.white.opacity(0.12),
                             Color.clear,
-                            Color.black.opacity(0.5)
+                            Color.black.opacity(0.55)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -156,14 +192,14 @@ struct RealisticCardView: View {
                         Text(card.name)
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(.white.opacity(0.95))
-                            .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
+                            .shadow(color: .black.opacity(0.5), radius: 1.5, y: 1)
                             .lineLimit(1)
 
                         if !card.bankName.isEmpty {
                             Text(card.bankName)
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.75))
-                                .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
+                                .foregroundStyle(.white.opacity(0.80))
+                                .shadow(color: .black.opacity(0.5), radius: 1.5, y: 1)
                                 .lineLimit(1)
                         }
                     }
@@ -175,15 +211,18 @@ struct RealisticCardView: View {
 
                 Spacer(minLength: 6)
 
-                // Ligne médiane : Puce EMV 3D + Symbole sans contact NFC
+                // Ligne médiane : Puce EMV 3D (conditionnelle) + Symbole sans contact NFC
                 HStack(spacing: 12) {
-                    chipView
+                    if effectiveShowChip {
+                        chipView
+                            .transition(.scale.combined(with: .opacity))
+                    }
 
                     Image(systemName: "wave.3.right")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.65))
+                        .foregroundStyle(Color.white.opacity(0.70))
                         .rotationEffect(.degrees(90))
-                        .shadow(color: .black.opacity(0.3), radius: 1, y: 1)
+                        .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
 
                     Spacer()
                 }
@@ -198,7 +237,7 @@ struct RealisticCardView: View {
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.68)
-                    .shadow(color: .black.opacity(0.6), radius: 2, x: 0, y: 1)
+                    .shadow(color: .black.opacity(0.65), radius: 2, x: 0, y: 1)
 
                 Spacer(minLength: 8)
 
@@ -213,7 +252,27 @@ struct RealisticCardView: View {
         }
         .frame(height: 205)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .shadow(color: .black.opacity(0.45), radius: 14, x: 0, y: 8)
+        .shadow(
+            color: Color.black.opacity(isInteracting ? 0.55 : 0.40),
+            radius: isInteracting ? 22 : 14,
+            x: CGFloat(rollDegrees * 0.5),
+            y: CGFloat(8 - pitchDegrees * 0.5)
+        )
+        .rotation3DEffect(.degrees(pitchDegrees), axis: (x: 1, y: 0, z: 0), perspective: 0.4)
+        .rotation3DEffect(.degrees(rollDegrees), axis: (x: 0, y: 1, z: 0), perspective: 0.4)
+        .scaleEffect(isInteracting ? 1.025 : 1.0)
+        .animation(isInteracting ? .interactiveSpring(response: 0.25, dampingFraction: 0.8) : Motion.spring, value: dragOffset)
+        .gesture(
+            enableTilt ? DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    isInteracting = true
+                    dragOffset = value.translation
+                }
+                .onEnded { _ in
+                    isInteracting = false
+                    dragOffset = .zero
+                } : nil
+        )
     }
 
     // MARK: - Composants Visuels

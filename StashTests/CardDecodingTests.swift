@@ -30,6 +30,18 @@ struct CardDecodingTests {
         #expect(card.hasCustomArt == false)
         #expect(card.bankName == "")
         #expect(card.manualNetworkRaw == "")
+        #expect(card.showChip == true)
+    }
+
+    @Test("Sérialisation et désérialisation du champ showChip")
+    func testShowChipSerialization() throws {
+        var card = Card(kind: .bank, name: "Carte Métal", showChip: false)
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(card)
+
+        let decoder = JSONDecoder()
+        let decoded = try decoder.decode(Card.self, from: data)
+        #expect(decoded.showChip == false)
     }
 
     @Test("Réseau manuel vs réseau détecté")
