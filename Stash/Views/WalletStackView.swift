@@ -53,7 +53,7 @@ struct WalletStackView: View {
                         .offset(y: isExpanded ? max(0, dragOffset) : 0)
                         .zIndex(isExpanded ? 999 : Double(index))
                         .animation(Motion.spring, value: expandedCardID)
-                        .animation(Motion.spring, value: dragOffset)
+                        .animation(dragOffset == 0 ? Motion.spring : nil, value: dragOffset)
                         .gesture(
                             isExpanded ? DragGesture()
                                 .onChanged { value in
@@ -186,11 +186,17 @@ private struct WalletStackItemView: View {
             // Panneau d'actions qui apparaît quand la carte est dépliée
             if isExpanded {
                 expandedActionsPanel
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(
+                        .asymmetric(
+                            insertion: .scale(scale: 0.92, anchor: .top).combined(with: .opacity),
+                            removal: .opacity
+                        )
+                    )
             }
         }
-        .opacity(isAnyExpanded && !isExpanded ? 0.45 : 1.0)
-        .scaleEffect(isAnyExpanded && !isExpanded ? 0.96 : 1.0)
+        .opacity(isAnyExpanded && !isExpanded ? 0.4 : 1.0)
+        .scaleEffect(isAnyExpanded && !isExpanded ? 0.95 : 1.0)
+        .blur(radius: isAnyExpanded && !isExpanded ? 2 : 0)
     }
 
     // MARK: Passe Fidélité
@@ -284,7 +290,7 @@ private struct WalletStackItemView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .glassProminentButtonIfAvailable()
                     .tint(.stashRed)
 
                     Button(action: onOpenDetail) {
@@ -293,7 +299,7 @@ private struct WalletStackItemView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
                     }
-                    .buttonStyle(.bordered)
+                    .glassButtonIfAvailable()
                 }
             } else {
                 // Actions carte bancaire
@@ -303,12 +309,13 @@ private struct WalletStackItemView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                 }
-                .buttonStyle(.borderedProminent)
+                .glassProminentButtonIfAvailable()
                 .tint(.stashRed)
             }
         }
-        .padding(.top, 12)
-        .padding(.horizontal, 4)
+        .padding(14)
+        .glassPanel(cornerRadius: 24)
+        .padding(.top, 10)
     }
 }
 

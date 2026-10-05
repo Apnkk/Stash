@@ -158,7 +158,7 @@ struct AddBankCardFlowView: View {
                             enableTilt: true,
                             showChipOverride: showChip
                         )
-                        .scaleEffect(focusedField != nil ? 0.85 : 1.0, anchor: .top)
+                        .frame(maxWidth: focusedField != nil ? 250 : .infinity)
                         .padding(.horizontal, 20)
                         .padding(.top, 4)
                         .animation(Motion.snappy, value: focusedField != nil)
@@ -188,6 +188,7 @@ struct AddBankCardFlowView: View {
                     }
                     .padding(.bottom, 24)
                 }
+                .scrollDismissesKeyboard(.interactively)
 
                 // 3. Pied de page avec bouton d'action principal
                 footer

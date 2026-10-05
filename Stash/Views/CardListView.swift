@@ -168,11 +168,8 @@ struct CardListView: View {
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
-                        .background(
-                            filterOption == filter ? Color.stashRed : Color.secondary.opacity(0.15),
-                            in: Capsule()
-                        )
                         .foregroundStyle(filterOption == filter ? Color.white : Color.primary)
+                        .glassCapsule(tint: filterOption == filter ? Color.stashRed : nil)
                     }
                     .buttonStyle(.plain)
                 }
@@ -375,13 +372,16 @@ struct CardTileView: View {
         return [base, base.opacity(0.75)]
     }
 
-    var body: some View {
+    /// Carte bancaire habillée d'un visuel : le visuel EST la carte, on le rend
+    /// au vrai ratio au lieu de le rogner dans une vignette de hauteur fixe.
+    private var usesArtCard: Bool {
+        card.kind == .bank && (CardDesign.find(card.designID) != nil || card.hasCustomArt)
+    }
+
+    private var tileContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                if card.kind == .bank {
-                    // Puce EMV miniature, pour évoquer la carte physique.
-                    miniChip
-                } else {
+                if card.kind != .bank {
                     Image(systemName: card.kind == .other ? "rectangle.stack.fill" : "barcode")
                         .foregroundStyle(.white.opacity(0.9))
                 }
@@ -396,11 +396,7 @@ struct CardTileView: View {
                 }
 
                 Spacer()
-                // Logo réseau (Visa/Mastercard/…) figé à la saisie, sinon le
-                // libellé du type de carte.
-                if card.kind == .bank, card.network != .unknown {
-                    tileNetworkLogo
-                } else {
+                if card.kind != .bank {
                     Text(card.kind.label)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.8))
@@ -466,15 +462,18 @@ struct CardTileView: View {
                 )
             }
         }
-        .overlay {
-            if #available(iOS 26, *) {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(.clear)
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .allowsHitTesting(false)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .glassEdge(cornerRadius: 18)
+    }
+
+    var body: some View {
+        Group {
+            if usesArtCard {
+                RealisticCardView(card: card)
+            } else {
+                tileContent
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             // Liseré lumineux qui pulse brièvement pour la carte tout juste ajoutée.
             if isHighlighted {
