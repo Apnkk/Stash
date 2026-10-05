@@ -185,7 +185,7 @@ struct SettingsView: View {
                 // MARK: Infos app
                 Section {
                     LabeledContent("Cartes enregistrées", value: "\(store.cards.count)")
-                    LabeledContent("Version", value: "2.0.0 (build 20)")
+                    LabeledContent("Version", value: "2.1.0 (build 21)")
                 } header: {
                     Text("Informations")
                 } footer: {
